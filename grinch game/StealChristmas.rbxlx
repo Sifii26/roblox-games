@@ -1,0 +1,4062 @@
+<roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" version="4"><Item class="Workspace" referent="RBX00000001"><Properties><string name="Name">Workspace</string><bool name="StreamingEnabled">true</bool><float name="StreamingTargetRadius">768</float><float name="StreamingMinRadius">256</float></Properties></Item><Item class="Players" referent="RBX00000002"><Properties><string name="Name">Players</string><bool name="CharacterAutoLoads">false</bool></Properties></Item><Item class="Lighting" referent="RBX00000003"><Properties><string name="Name">Lighting</string></Properties></Item><Item class="ReplicatedStorage" referent="RBX0000000C"><Properties><string name="Name">ReplicatedStorage</string></Properties><Item class="Folder" referent="RBX0000000B"><Properties><string name="Name">Shared</string></Properties><Item class="Folder" referent="RBX00000009"><Properties><string name="Name">Config</string></Properties><Item class="ModuleScript" referent="RBX00000004"><Properties><string name="Name">Audio</string><ProtectedString name="Source"><![CDATA[--!strict
+-- Music tracks per game state.
+-- Put the asset id of a track you are allowed to use (for example a Roblox-licensed
+-- track from the Creator Store "Audio" tab) in each SoundId. Leave it as "" to keep
+-- that state silent. The music system skips empty ids instead of erroring.
+export type Track = { SoundId: string, Volume: number, Looped: boolean }
+
+local Tracks: { [string]: Track } = {
+	Menu = { SoundId = "", Volume = 0.6, Looped = true }, -- cheerful instrumental
+	Outside = { SoundId = "", Volume = 0.5, Looped = true }, -- cheerful instrumental
+	Inside = { SoundId = "", Volume = 0.5, Looped = true }, -- sneaky / suspense (future)
+	Detected = { SoundId = "", Volume = 0.7, Looped = true }, -- chase (future)
+	Victory = { SoundId = "", Volume = 0.7, Looped = false }, -- short stinger (future)
+}
+
+return {
+	Tracks = Tracks,
+	CrossfadeTime = 1.5,
+}
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX00000005"><Properties><string name="Name">Economy</string><ProtectedString name="Source"><![CDATA[--!strict
+-- Economy values for future phases (not used for gameplay yet).
+return {
+	StartingCash = 0,
+	Upgrades = {
+		{ Id = "Sleigh2", Name = "Reinforced Sleigh", Cost = 2500, Description = "Sturdier runners and a bigger cargo bed." },
+		{ Id = "BigSack", Name = "Bottomless Sack", Cost = 1200, Description = "Carry more presents per trip." },
+		{ Id = "SoftBoots", Name = "Soft-Step Boots", Cost = 900, Description = "Make less noise while sneaking." },
+		{ Id = "DogTreats", Name = "Premium Dog Treats", Cost = 700, Description = "Your dog pulls the sleigh faster." },
+	},
+}
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX00000006"><Properties><string name="Name">GameInfo</string><ProtectedString name="Source"><![CDATA[--!strict
+-- Central place for names and labels that are likely to change.
+return {
+	Title = "STEAL CHRISTMAS",
+	Subtitle = "A Holiday Heist",
+	TownName = "Tinselbrook",
+	Version = "Phase 1",
+}
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX00000007"><Properties><string name="Name">Layout</string><ProtectedString name="Source"><![CDATA[--!strict
+-- World layout constants shared by the world builder and future systems
+-- (sleigh, NPCs, missions). All units are studs.
+return {
+	RoadWidth = 30, -- wide enough for a dog-pulled sleigh to turn
+	SidewalkWidth = 8,
+	GroundY = 0,
+
+	TownCenter = Vector3.new(0, 0, 0),
+	PlazaHalf = 70, -- plaza is 140x140, ring road around it
+	RingRoad = 95, -- ring road centerline offset from plaza center
+
+	Neighborhood = { StartX = -110, EndX = -520, Z = 0, CulDeSacRadius = 46 },
+	GatedEntranceX = 330, -- gate along the east road
+	MansionGateZ = -360, -- gate along the north road
+	Hideout = Vector3.new(0, 130, 700),
+	MenuCamera = {
+		Position = Vector3.new(-160, 120, 260),
+		LookAt = Vector3.new(-120, 15, -20),
+	},
+	FreeRoamSpawn = Vector3.new(0, 4, 72),
+}
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX00000008"><Properties><string name="Name">Missions</string><ProtectedString name="Source"><![CDATA[--!strict
+-- Mission definitions. Only Free Roam is playable in Phase 1.
+export type Mission = {
+	Id: string,
+	Name: string,
+	Difficulty: string,
+	Reward: number?,
+	Description: string,
+	Playable: boolean,
+	Accent: Color3,
+}
+
+local Missions: { Mission } = {
+	{
+		Id = "FirstHouse",
+		Name = "The First House",
+		Difficulty = "Easy",
+		Reward = 500,
+		Description = "A sleepy cottage on Holly Lane. Slip down the chimney, grab the gifts under the tree, and get out before anyone wakes up.",
+		Playable = false,
+		Accent = Color3.fromRGB(96, 200, 120),
+	},
+	{
+		Id = "SilentNight",
+		Name = "Silent Night",
+		Difficulty = "Medium",
+		Reward = 1500,
+		Description = "Three houses, one night. The neighbors are light sleepers and the street is full of twinkling lights.",
+		Playable = false,
+		Accent = Color3.fromRGB(240, 180, 70),
+	},
+	{
+		Id = "MansionHeist",
+		Name = "The Mansion Heist",
+		Difficulty = "Hard",
+		Reward = 5000,
+		Description = "Cameras, lasers, and a guard at the gate. The biggest pile of presents in town is waiting behind the mansion walls.",
+		Playable = false,
+		Accent = Color3.fromRGB(230, 80, 80),
+	},
+	{
+		Id = "FreeRoam",
+		Name = "Free Roam",
+		Difficulty = "Explore",
+		Reward = nil,
+		Description = "Explore the town, the starter neighborhood, and your mountain hideout with no pressure.",
+		Playable = true,
+		Accent = Color3.fromRGB(110, 170, 255),
+	},
+}
+
+return Missions
+]]></ProtectedString></Properties></Item></Item><Item class="ModuleScript" referent="RBX0000000A"><Properties><string name="Name">Remotes</string><ProtectedString name="Source"><![CDATA[--!strict
+-- Creates (server) or waits for (client) the RemoteEvents used by the game.
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local NAMES = { "StartFreeRoam", "ReturnToMenu" }
+
+local Remotes = {}
+
+local folder: Folder
+if RunService:IsServer() then
+	folder = ReplicatedStorage:FindFirstChild("Remotes") :: Folder
+	if not folder then
+		folder = Instance.new("Folder")
+		folder.Name = "Remotes"
+		folder.Parent = ReplicatedStorage
+	end
+	for _, name in NAMES do
+		if not folder:FindFirstChild(name) then
+			local ev = Instance.new("RemoteEvent")
+			ev.Name = name
+			ev.Parent = folder
+		end
+	end
+else
+	folder = ReplicatedStorage:WaitForChild("Remotes") :: Folder
+end
+
+function Remotes.get(name: string): RemoteEvent
+	return folder:WaitForChild(name) :: RemoteEvent
+end
+
+return Remotes
+]]></ProtectedString></Properties></Item></Item></Item><Item class="ServerScriptService" referent="RBX0000001B"><Properties><string name="Name">ServerScriptService</string></Properties><Item class="Folder" referent="RBX0000001A"><Properties><string name="Name">Server</string></Properties><Item class="Script" referent="RBX0000000D"><Properties><string name="Name">Main</string><ProtectedString name="Source"><![CDATA[--!strict
+-- Server entry point: build the world, then start services.
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+
+Players.CharacterAutoLoads = false
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+require(Shared.Remotes) -- creates the RemoteEvents
+
+local World = require(script.Parent.World)
+local PlayerService = require(script.Parent.Services.PlayerService)
+
+PlayerService.start()
+
+local t = os.clock()
+World.build()
+ReplicatedStorage:SetAttribute("WorldReady", true)
+print(string.format("[Main] World ready in %.2fs", os.clock() - t))
+]]></ProtectedString></Properties></Item><Item class="Folder" referent="RBX0000000F"><Properties><string name="Name">Services</string></Properties><Item class="ModuleScript" referent="RBX0000000E"><Properties><string name="Name">PlayerService</string><ProtectedString name="Source"><![CDATA[--!strict
+-- Handles players moving between the menu and Free Roam.
+-- Characters do not load automatically (Players.CharacterAutoLoads = false);
+-- the menu asks the server to spawn the character when Free Roam starts.
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+
+local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
+local Remotes = require(Shared.Remotes)
+local Layout = require(Shared.Config.Layout)
+local Missions = require(Shared.Config.Missions)
+
+local PlayerService = {}
+
+local lastRequest: { [Player]: number } = {}
+local menuFocus: BasePart
+
+local function isPlayable(missionId: string): boolean
+	for _, m in Missions do
+		if m.Id == missionId then
+			return m.Playable
+		end
+	end
+	return false
+end
+
+local function spawnCharacter(player: Player)
+	player.ReplicationFocus = nil
+	player:LoadCharacter()
+	local character = player.Character
+	if not character then
+		return
+	end
+	local root = character:WaitForChild("HumanoidRootPart", 5) :: BasePart?
+	if root then
+		local spawnPos = Layout.FreeRoamSpawn
+		character:PivotTo(CFrame.lookAt(spawnPos, Vector3.new(0, spawnPos.Y, 0)))
+	end
+	player:SetAttribute("InFreeRoam", true)
+end
+
+function PlayerService.start()
+	-- Players in the menu stream the area around the menu camera.
+	menuFocus = Instance.new("Part")
+	menuFocus.Name = "MenuStreamFocus"
+	menuFocus.Anchored = true
+	menuFocus.CanCollide = false
+	menuFocus.CanQuery = false
+	menuFocus.CanTouch = false
+	menuFocus.Transparency = 1
+	menuFocus.Size = Vector3.one
+	menuFocus.Position = Layout.MenuCamera.LookAt
+	menuFocus.Parent = Workspace
+
+	Players.PlayerAdded:Connect(function(player)
+		player.ReplicationFocus = menuFocus
+		player:SetAttribute("InFreeRoam", false)
+	end)
+	for _, player in Players:GetPlayers() do
+		player.ReplicationFocus = menuFocus
+	end
+	Players.PlayerRemoving:Connect(function(player)
+		lastRequest[player] = nil
+	end)
+
+	Remotes.get("StartFreeRoam").OnServerEvent:Connect(function(player, missionId)
+		if typeof(missionId) ~= "string" or not isPlayable(missionId) then
+			return
+		end
+		local now = os.clock()
+		if lastRequest[player] and now - lastRequest[player] < 2 then
+			return -- debounce repeated clicks
+		end
+		lastRequest[player] = now
+		spawnCharacter(player)
+	end)
+
+	Remotes.get("ReturnToMenu").OnServerEvent:Connect(function(player)
+		local now = os.clock()
+		if lastRequest[player] and now - lastRequest[player] < 1 then
+			return
+		end
+		lastRequest[player] = now
+		if player.Character then
+			player.Character:Destroy()
+			player.Character = nil
+		end
+		player.ReplicationFocus = menuFocus
+		player:SetAttribute("InFreeRoam", false)
+	end)
+
+	-- Respawn in Free Roam after falling or resetting.
+	Players.PlayerAdded:Connect(function(player)
+		player.CharacterAdded:Connect(function(character)
+			local humanoid = character:WaitForChild("Humanoid") :: Humanoid
+			humanoid.Died:Connect(function()
+				task.wait(3)
+				if player.Parent and player:GetAttribute("InFreeRoam") and player.Character == character then
+					spawnCharacter(player)
+				end
+			end)
+		end)
+	end)
+end
+
+return PlayerService
+]]></ProtectedString></Properties></Item></Item><Item class="ModuleScript" referent="RBX00000019"><Properties><string name="Name">World</string><ProtectedString name="Source"><![CDATA[--!strict
+-- Builds the whole Phase 1 world into Workspace.Map.
+-- If a Map already exists (for example after you baked the generated map into
+-- the place file and hand-edited it), the builder leaves it alone.
+local Workspace = game:GetService("Workspace")
+
+local Builder = require(script.Builder)
+local Environment = require(script.Environment)
+local TownCenter = require(script.TownCenter)
+local Houses = require(script.Houses)
+local Districts = require(script.Districts)
+local Hideout = require(script.Hideout)
+local Layout = require(game:GetService("ReplicatedStorage").Shared.Config.Layout)
+
+local World = {}
+
+local function step(name: string, fn: () -> ())
+	local t = os.clock()
+	local ok, err = pcall(fn)
+	if ok then
+		print(string.format("[World] %s built in %.2fs", name, os.clock() - t))
+	else
+		warn(string.format("[World] %s failed: %s", name, tostring(err)))
+	end
+end
+
+function World.build(): Model
+	local existing = Workspace:FindFirstChild("Map")
+	if existing and existing:IsA("Model") then
+		print("[World] Existing Map found; skipping generation")
+		Environment.lighting()
+		return existing
+	end
+
+	local map = Builder.model("Map", nil)
+	map.ModelStreamingMode = Enum.ModelStreamingMode.Default
+
+	step("Lighting", Environment.lighting)
+	step("Terrain", function()
+		Environment.terrain(map)
+	end)
+	step("Roads", function()
+		Environment.roads(map)
+	end)
+	step("Town center", function()
+		TownCenter.build(map)
+	end)
+	step("Starter neighborhood", function()
+		local hood = Builder.folder("StarterNeighborhood", map)
+		local n = Layout.Neighborhood
+		local edge = Layout.RoadWidth / 2 + Layout.SidewalkWidth
+		-- Lots on the north side face +Z (toward the road); south side faces -Z.
+		local function northLot(x: number): CFrame
+			return CFrame.lookAt(Vector3.new(x, 0, n.Z - edge), Vector3.new(x, 0, n.Z))
+		end
+		local function southLot(x: number): CFrame
+			return CFrame.lookAt(Vector3.new(x, 0, n.Z + edge), Vector3.new(x, 0, n.Z))
+		end
+		Houses.hollyCottage(hood, northLot(-180))
+		Houses.crookedSpire(hood, southLot(-230))
+		Houses.gingerbreadLodge(hood, northLot(-300))
+		Houses.twinDomes(hood, southLot(-350))
+		Houses.curlicueTownhouse(hood, northLot(-420))
+		-- Lamp posts along Holly Lane.
+		local Props = require(script.Props)
+		for x = -140, -500, -60 do
+			Props.lamppost(hood, CFrame.lookAt(Vector3.new(x, 0.9, n.Z - edge + 3), Vector3.new(x, 0.9, n.Z)), true)
+			Props.lamppost(hood, CFrame.lookAt(Vector3.new(x - 30, 0.9, n.Z + edge - 3), Vector3.new(x - 30, 0.9, n.Z)), true)
+		end
+		-- Trees between the town and the first lots.
+		local rng = Random.new(5)
+		for _, z in { -100, 100 } do
+			for i = 0, 2 do
+				Props.pine(hood, CFrame.new(-128 - i * 6, 0, z + rng:NextNumber(-8, 8)), rng:NextNumber(20, 30), rng)
+			end
+		end
+	end)
+	step("Gated community", function()
+		Districts.gatedCommunity(map)
+	end)
+	step("Mansion district", function()
+		Districts.mansionDistrict(map)
+	end)
+	step("Mountain hideout", function()
+		Hideout.build(map)
+	end)
+
+	-- Interior zone for the cottage, used by the music system to switch states.
+	local cottage = map:FindFirstChild("HollyCottage", true)
+	if cottage and cottage:IsA("Model") then
+		local cf, size = cottage:GetBoundingBox()
+		local interior = cottage:FindFirstChild("Interior")
+		if interior and interior:IsA("Model") then
+			cf, size = interior:GetBoundingBox()
+		end
+		local zone = Builder.part({ Name = "InteriorZone", Size = size, CFrame = cf, Transparency = 1, CanCollide = false, CastShadow = false, Parent = cottage })
+		zone.CanQuery = false
+		zone.CanTouch = false
+		Builder.tag(zone, "InteriorZone")
+	end
+
+	map.Parent = Workspace
+	return map
+end
+
+return World
+]]></ProtectedString></Properties><Item class="ModuleScript" referent="RBX00000010"><Properties><string name="Name">Builder</string><ProtectedString name="Source"><![CDATA[--!strict
+-- Small helpers for building anchored geometry from code.
+-- Every world module uses these so the art style stays consistent.
+local CollectionService = game:GetService("CollectionService")
+
+local Builder = {}
+
+export type PartProps = {
+	Name: string?,
+	Size: Vector3,
+	CFrame: CFrame,
+	Color: Color3?,
+	Material: Enum.Material?,
+	Shape: Enum.PartType?,
+	Transparency: number?,
+	CanCollide: boolean?,
+	CastShadow: boolean?,
+	Reflectance: number?,
+	Parent: Instance?,
+	Class: string?, -- "Part" (default) | "WedgePart" | "CornerWedgePart"
+}
+
+function Builder.part(p: PartProps): BasePart
+	local part: BasePart = Instance.new((p.Class or "Part") :: any)
+	part.Name = p.Name or "Part"
+	part.Anchored = true
+	if p.Shape and part:IsA("Part") then
+		(part :: Part).Shape = p.Shape
+	end
+	part.Size = p.Size
+	part.CFrame = p.CFrame
+	part.Color = p.Color or Color3.new(1, 1, 1)
+	part.Material = p.Material or Enum.Material.SmoothPlastic
+	part.Transparency = p.Transparency or 0
+	part.Reflectance = p.Reflectance or 0
+	part.CanCollide = if p.CanCollide == nil then true else p.CanCollide
+	part.CastShadow = if p.CastShadow == nil then true else p.CastShadow
+	part.TopSurface = Enum.SurfaceType.Smooth
+	part.BottomSurface = Enum.SurfaceType.Smooth
+	part.Parent = p.Parent
+	return part
+end
+
+function Builder.model(name: string, parent: Instance?): Model
+	local m = Instance.new("Model")
+	m.Name = name
+	m.Parent = parent
+	return m
+end
+
+function Builder.folder(name: string, parent: Instance?): Folder
+	local f = Instance.new("Folder")
+	f.Name = name
+	f.Parent = parent
+	return f
+end
+
+-- Cylinder standing upright (Roblox cylinders run along X, so rotate them).
+function Builder.vcyl(parent: Instance, name: string, center: CFrame, height: number, diameter: number, color: Color3, material: Enum.Material?, collide: boolean?): BasePart
+	return Builder.part({
+		Name = name,
+		Size = Vector3.new(height, diameter, diameter),
+		CFrame = center * CFrame.Angles(0, 0, math.pi / 2),
+		Color = color,
+		Material = material,
+		Shape = Enum.PartType.Cylinder,
+		CanCollide = collide,
+		Parent = parent,
+	})
+end
+
+-- Cylinder lying along the given CFrame's X axis.
+function Builder.hcyl(parent: Instance, name: string, cf: CFrame, length: number, diameter: number, color: Color3, material: Enum.Material?, collide: boolean?): BasePart
+	return Builder.part({
+		Name = name,
+		Size = Vector3.new(length, diameter, diameter),
+		CFrame = cf,
+		Color = color,
+		Material = material,
+		Shape = Enum.PartType.Cylinder,
+		CanCollide = collide,
+		Parent = parent,
+	})
+end
+
+function Builder.ball(parent: Instance, name: string, pos: Vector3, diameter: number, color: Color3, material: Enum.Material?, collide: boolean?): BasePart
+	return Builder.part({
+		Name = name,
+		Size = Vector3.new(diameter, diameter, diameter),
+		CFrame = CFrame.new(pos),
+		Color = color,
+		Material = material,
+		Shape = Enum.PartType.Ball,
+		CanCollide = collide,
+		Parent = parent,
+	})
+end
+
+-- Non-uniform rounded blob (ellipsoid) using a Sphere SpecialMesh.
+-- Good for snow mounds, bushes and stylized pine tiers.
+function Builder.blob(parent: Instance, name: string, cf: CFrame, size: Vector3, color: Color3, material: Enum.Material?, collide: boolean?): BasePart
+	local part = Builder.part({
+		Name = name,
+		Size = size,
+		CFrame = cf,
+		Color = color,
+		Material = material,
+		CanCollide = collide,
+		Parent = parent,
+	})
+	local mesh = Instance.new("SpecialMesh")
+	mesh.MeshType = Enum.MeshType.Sphere
+	mesh.Parent = part
+	return part
+end
+
+-- A thin layer of snow resting on top of a block.
+function Builder.snowCap(parent: Instance, onto: BasePart, thickness: number?, overhang: number?)
+	local t = thickness or 0.6
+	local o = overhang or 0.4
+	local size = onto.Size
+	return Builder.part({
+		Name = "Snow",
+		Size = Vector3.new(size.X + o, t, size.Z + o),
+		CFrame = onto.CFrame * CFrame.new(0, size.Y / 2 + t / 2, 0),
+		Color = Builder.Palette.Snow,
+		Material = Enum.Material.Snow,
+		CastShadow = false,
+		Parent = parent,
+	})
+end
+
+function Builder.tag(inst: Instance, tag: string)
+	CollectionService:AddTag(inst, tag)
+end
+
+function Builder.pointLight(part: BasePart, color: Color3, range: number, brightness: number, shadows: boolean?)
+	local l = Instance.new("PointLight")
+	l.Color = color
+	l.Range = range
+	l.Brightness = brightness
+	l.Shadows = shadows or false
+	l.Parent = part
+	return l
+end
+
+function Builder.surfaceLight(part: BasePart, face: Enum.NormalId, color: Color3, range: number, brightness: number, angle: number?)
+	local l = Instance.new("SurfaceLight")
+	l.Face = face
+	l.Color = color
+	l.Range = range
+	l.Brightness = brightness
+	l.Angle = angle or 120
+	l.Parent = part
+	return l
+end
+
+-- Builds a straight wall along the local X axis of `origin` (origin = left
+-- bottom corner, wall grows toward +X and +Y, thickness centered on Z).
+-- `openings` cut doors/windows: { x = offset from left, w = width, y = bottom, h = height }.
+export type Opening = { x: number, w: number, y: number, h: number }
+function Builder.wall(parent: Instance, name: string, origin: CFrame, length: number, height: number, thickness: number, color: Color3, material: Enum.Material?, openings: { Opening }?)
+	local ops = table.clone(openings or {})
+	table.sort(ops, function(a, b)
+		return a.x < b.x
+	end)
+
+	local function seg(x0: number, x1: number, y0: number, y1: number)
+		if x1 - x0 < 0.05 or y1 - y0 < 0.05 then
+			return
+		end
+		Builder.part({
+			Name = name,
+			Size = Vector3.new(x1 - x0, y1 - y0, thickness),
+			CFrame = origin * CFrame.new((x0 + x1) / 2, (y0 + y1) / 2, 0),
+			Color = color,
+			Material = material,
+			Parent = parent,
+		})
+	end
+
+	local cursor = 0
+	for _, o in ops do
+		seg(cursor, o.x, 0, height) -- solid wall before the opening
+		seg(o.x, o.x + o.w, 0, o.y) -- below the opening
+		seg(o.x, o.x + o.w, o.y + o.h, height) -- above the opening
+		cursor = o.x + o.w
+	end
+	seg(cursor, length, 0, height)
+end
+
+-- Two-piece gable roof with ridge along local X of `base` (base = center of the
+-- top of the walls). Includes snow layers that follow the slope and
+-- triangular gable ends made from wedges.
+function Builder.gableRoof(parent: Instance, base: CFrame, length: number, depth: number, rise: number, overhang: number, color: Color3, wallColor: Color3)
+	local half = depth / 2
+	local slopeLen = math.sqrt(half * half + rise * rise)
+	local angle = math.atan2(rise, half)
+	local thick = 1.2
+	for _, side in { -1, 1 } do
+		-- Slab centered halfway down the slope, tilted toward the side.
+		local cf = base
+			* CFrame.new(0, rise / 2, side * half / 2)
+			* CFrame.Angles(side * angle, 0, 0)
+			* CFrame.new(0, thick / 2, 0)
+		local slab = Builder.part({
+			Name = "RoofSlab",
+			Size = Vector3.new(length + overhang * 2, thick, slopeLen + overhang),
+			CFrame = cf,
+			Color = color,
+			Material = Enum.Material.Slate,
+			Parent = parent,
+		})
+		Builder.part({
+			Name = "RoofSnow",
+			Size = Vector3.new(slab.Size.X - 0.6, 0.9, slab.Size.Z - 0.8),
+			CFrame = slab.CFrame * CFrame.new(0, thick / 2 + 0.45, -side * 0.3),
+			Color = Builder.Palette.Snow,
+			Material = Enum.Material.Snow,
+			CastShadow = false,
+			Parent = parent,
+		})
+	end
+	-- Gable ends: two wedges per end. A WedgePart's tall edge is on its +Z (back)
+	-- side and its slope faces -Z, so the wedge on the -Z half points its tall
+	-- edge toward the ridge unrotated, and the +Z half is turned 180 degrees.
+	for _, endSide in { -1, 1 } do
+		for _, side in { -1, 1 } do
+			local rot = if side == -1 then CFrame.new() else CFrame.Angles(0, math.pi, 0)
+			Builder.part({
+				Class = "WedgePart",
+				Name = "Gable",
+				Size = Vector3.new(0.8, rise, half),
+				CFrame = base * CFrame.new(endSide * (length / 2 - 0.4), rise / 2, side * half / 2) * rot,
+				Color = wallColor,
+				Material = Enum.Material.WoodPlanks,
+				Parent = parent,
+			})
+		end
+	end
+end
+
+-- A string of Christmas bulbs between two points. Bulbs are tagged so the
+-- client can animate them; only every few bulbs gets a real light for performance.
+local BULB_COLORS = {
+	Color3.fromRGB(255, 70, 70),
+	Color3.fromRGB(80, 220, 110),
+	Color3.fromRGB(255, 200, 60),
+	Color3.fromRGB(80, 150, 255),
+	Color3.fromRGB(255, 120, 220),
+}
+function Builder.stringLights(parent: Instance, a: Vector3, b: Vector3, spacing: number?, sag: number?, lightEvery: number?)
+	local folder = Builder.model("StringLights", parent)
+	local dist = (b - a).Magnitude
+	local count = math.max(2, math.floor(dist / (spacing or 2.5)))
+	local s = sag or 0.6
+	local every = lightEvery or 0
+	local prev: Vector3? = nil
+	for i = 0, count do
+		local t = i / count
+		local pos = a:Lerp(b, t) - Vector3.new(0, math.sin(t * math.pi) * s, 0)
+		if prev then
+			local mid = (prev + pos) / 2
+			local len = (pos - prev).Magnitude
+			Builder.part({
+				Name = "Wire",
+				Size = Vector3.new(0.12, 0.12, len),
+				CFrame = CFrame.lookAt(mid, pos),
+				Color = Color3.fromRGB(30, 50, 30),
+				CanCollide = false,
+				CastShadow = false,
+				Parent = folder,
+			})
+		end
+		local bulb = Builder.part({
+			Name = "Bulb",
+			Size = Vector3.new(0.45, 0.6, 0.45),
+			CFrame = CFrame.new(pos - Vector3.new(0, 0.3, 0)),
+			Color = BULB_COLORS[(i % #BULB_COLORS) + 1],
+			Material = Enum.Material.Neon,
+			CanCollide = false,
+			CastShadow = false,
+			Parent = folder,
+		})
+		bulb:SetAttribute("Index", i)
+		Builder.tag(bulb, "XmasBulb")
+		if every > 0 and i % every == 0 then
+			Builder.pointLight(bulb, bulb.Color, 7, 0.8)
+		end
+		prev = pos
+	end
+	return folder
+end
+
+Builder.Palette = {
+	Snow = Color3.fromRGB(242, 247, 255),
+	Ice = Color3.fromRGB(200, 225, 245),
+	Road = Color3.fromRGB(70, 74, 86),
+	RoadLine = Color3.fromRGB(230, 200, 120),
+	Sidewalk = Color3.fromRGB(165, 165, 175),
+	Cobble = Color3.fromRGB(120, 112, 118),
+	Wood = Color3.fromRGB(110, 72, 45),
+	DarkWood = Color3.fromRGB(70, 45, 30),
+	Pine = Color3.fromRGB(34, 92, 62),
+	PineDark = Color3.fromRGB(24, 70, 48),
+	Window = Color3.fromRGB(255, 196, 110),
+	WarmLight = Color3.fromRGB(255, 180, 100),
+	Iron = Color3.fromRGB(40, 40, 46),
+	Gold = Color3.fromRGB(240, 196, 80),
+	Red = Color3.fromRGB(190, 40, 45),
+	Green = Color3.fromRGB(40, 130, 70),
+	Stone = Color3.fromRGB(130, 128, 136),
+	Rock = Color3.fromRGB(96, 98, 110),
+}
+
+return Builder
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX00000011"><Properties><string name="Name">Districts</string><ProtectedString name="Source"><![CDATA[--!strict
+-- Areas C and D: entrances and boundaries for the Gated Community and the
+-- Luxury Mansion District. The gates are closed in Phase 1; the land behind
+-- them is reserved (marked with FutureLot parts) for later phases.
+local B = require(script.Parent.Builder)
+local Props = require(script.Parent.Props)
+local Layout = require(game:GetService("ReplicatedStorage").Shared.Config.Layout)
+local P = B.Palette
+
+local Districts = {}
+
+local function pillar(parent: Instance, cf: CFrame, height: number, color: Color3, lanternColor: Color3)
+	local m = B.model("Pillar", parent)
+	B.part({ Name = "Base", Size = Vector3.new(7, 2, 7), CFrame = cf * CFrame.new(0, 1, 0), Color = color, Material = Enum.Material.Cobblestone, Parent = m })
+	B.part({ Name = "Column", Size = Vector3.new(5.5, height, 5.5), CFrame = cf * CFrame.new(0, 2 + height / 2, 0), Color = color, Material = Enum.Material.Cobblestone, Parent = m })
+	local cap = B.part({ Name = "Cap", Size = Vector3.new(7, 1.2, 7), CFrame = cf * CFrame.new(0, 2.6 + height, 0), Color = color, Material = Enum.Material.Concrete, Parent = m })
+	B.snowCap(m, cap, 0.6, 0)
+	local lantern = B.part({ Name = "Lantern", Size = Vector3.new(2.4, 3, 2.4), CFrame = cap.CFrame * CFrame.new(0, 2.6, 0), Color = lanternColor, Material = Enum.Material.Neon, CanCollide = false, Parent = m })
+	B.pointLight(lantern, lanternColor, 28, 1.4)
+	-- Mount point for a future security camera.
+	local mount = Instance.new("Attachment")
+	mount.Name = "CameraMount"
+	mount.Position = Vector3.new(0, height / 2 - 1, -3)
+	mount.Parent = m:FindFirstChild("Column")
+	B.tag(m:FindFirstChild("Column") :: Instance, "CameraMount")
+	Props.wreath(m, cf * CFrame.new(0, 2 + height * 0.6, -2.9), 3.6)
+	return m
+end
+
+-- Iron gate spanning `width`, centered at `cf` (LookVector = outward side).
+local function ironGate(parent: Instance, cf: CFrame, width: number, height: number, color: Color3, accent: Color3)
+	local m = B.model("Gate", parent)
+	B.tag(m, "FutureGate")
+	m:SetAttribute("Open", false)
+	for _, side in { -1, 1 } do
+		local leaf = B.model(if side == -1 then "LeftLeaf" else "RightLeaf", m)
+		local lw = width / 2
+		local leafCf = cf * CFrame.new(side * lw / 2, 0, 0)
+		local bars = math.floor(lw / 1.4)
+		for i = 0, bars do
+			local x = -lw / 2 + i * (lw / bars)
+			-- Bars rise toward the middle for an arched top.
+			local t = (x * side + lw / 2) / lw
+			local h = height + math.sin(t * math.pi / 2) * 3
+			B.part({ Name = "Bar", Size = Vector3.new(0.4, h, 0.4), CFrame = leafCf * CFrame.new(x, h / 2, 0), Color = color, Material = Enum.Material.Metal, Parent = leaf })
+			B.ball(leaf, "Finial", (leafCf * CFrame.new(x, h + 0.3, 0)).Position, 0.7, accent, Enum.Material.Metal, false)
+		end
+		for _, y in { 1.2, height * 0.55, height - 0.8 } do
+			B.part({ Name = "Rail", Size = Vector3.new(lw, 0.5, 0.5), CFrame = leafCf * CFrame.new(0, y, 0), Color = color, Material = Enum.Material.Metal, Parent = leaf })
+		end
+		Props.wreath(leaf, leafCf * CFrame.new(-side * 0.5, height * 0.55, -0.6), 3)
+	end
+	return m
+end
+
+local function wallRun(parent: Instance, a: Vector3, b: Vector3, height: number, color: Color3)
+	local len = (b - a).Magnitude
+	local cf = CFrame.lookAt((a + b) / 2, b)
+	local wall = B.part({ Name = "BoundaryWall", Size = Vector3.new(3, height, len), CFrame = cf * CFrame.new(0, height / 2, 0), Color = color, Material = Enum.Material.Cobblestone, Parent = parent })
+	local cap = B.part({ Name = "WallCap", Size = Vector3.new(4, 0.8, len), CFrame = cf * CFrame.new(0, height + 0.4, 0), Color = P.Stone, Material = Enum.Material.Concrete, Parent = parent })
+	B.snowCap(parent, cap, 0.5, 0)
+	-- Posts every so often break up the long wall.
+	local posts = math.floor(len / 40)
+	for i = 1, posts - 1 do
+		local p = B.part({ Name = "WallPost", Size = Vector3.new(4.5, height + 2, 4.5), CFrame = cf * CFrame.new(0, (height + 2) / 2, -len / 2 + i * (len / posts)), Color = color, Material = Enum.Material.Cobblestone, Parent = parent })
+		B.snowCap(parent, p, 0.5, 0)
+	end
+	return wall
+end
+
+local function futureLots(parent: Instance, origin: Vector3, cols: number, rows: number, spacing: Vector2, district: string)
+	local folder = B.folder("FutureLots", parent)
+	for c = 0, cols - 1 do
+		for r = 0, rows - 1 do
+			local lot = B.part({ Name = "FutureLot", Size = Vector3.new(spacing.X * 0.8, 0.2, spacing.Y * 0.8), CFrame = CFrame.new(origin + Vector3.new(c * spacing.X, 0.1, r * spacing.Y)), Transparency = 1, CanCollide = false, CastShadow = false, Parent = folder })
+			lot.CanQuery = false
+			lot.CanTouch = false
+			lot:SetAttribute("District", district)
+			B.tag(lot, "FutureLot")
+		end
+	end
+end
+
+function Districts.gatedCommunity(map: Instance)
+	local area = B.folder("GatedCommunity", map)
+	local x = Layout.GatedEntranceX
+	local W = Layout.RoadWidth
+	local stone = Color3.fromRGB(150, 140, 130)
+	-- Gate across the road, facing west toward town.
+	local gateCf = CFrame.lookAt(Vector3.new(x, 0.6, 0), Vector3.new(x - 10, 0.6, 0))
+	pillar(area, gateCf * CFrame.new(-(W / 2 + 4), 0, 0), 14, stone, P.WarmLight)
+	pillar(area, gateCf * CFrame.new(W / 2 + 4, 0, 0), 14, stone, P.WarmLight)
+	ironGate(area, gateCf, W + 2, 11, P.Iron, P.Gold)
+	-- Entrance arch with name board.
+	local beam = B.part({ Name = "ArchBeam", Size = Vector3.new(W + 16, 2.4, 3), CFrame = gateCf * CFrame.new(0, 21, 0), Color = P.DarkWood, Material = Enum.Material.Wood, Parent = area })
+	B.snowCap(area, beam, 0.6, 0)
+	local gui = Instance.new("SurfaceGui")
+	gui.Face = Enum.NormalId.Front
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	gui.PixelsPerStud = 25
+	gui.LightInfluence = 0
+	gui.Parent = beam
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.fromScale(1, 1)
+	label.BackgroundTransparency = 1
+	label.Text = "SNOWCREST ESTATES"
+	label.TextScaled = true
+	label.Font = Enum.Font.FredokaOne
+	label.TextColor3 = Color3.fromRGB(255, 230, 160)
+	label.Parent = gui
+	B.stringLights(area, (gateCf * CFrame.new(-(W / 2 + 8), 20, -1.8)).Position, (gateCf * CFrame.new(W / 2 + 8, 20, -1.8)).Position, 2, 1.2, 4)
+	-- Guard booth on the right side of the road (from the visitor's view).
+	local booth = B.model("GuardBooth", area)
+	local bcf = gateCf * CFrame.new(-(W / 2 + 14), 0, -10)
+	B.part({ Name = "BoothBase", Size = Vector3.new(10, 1, 10), CFrame = bcf * CFrame.new(0, 0.5, 0), Color = P.Stone, Material = Enum.Material.Concrete, Parent = booth })
+	B.part({ Name = "BoothBody", Size = Vector3.new(9, 4, 9), CFrame = bcf * CFrame.new(0, 3, 0), Color = Color3.fromRGB(230, 225, 215), Material = Enum.Material.Plaster, Parent = booth })
+	local glass = B.part({ Name = "BoothGlass", Size = Vector3.new(9.1, 4, 9.1), CFrame = bcf * CFrame.new(0, 7, 0), Color = P.Window, Material = Enum.Material.Glass, Transparency = 0.4, Parent = booth })
+	B.pointLight(glass, P.WarmLight, 16, 1)
+	local roof = B.part({ Name = "BoothRoof", Size = Vector3.new(12, 1, 12), CFrame = bcf * CFrame.new(0, 9.5, 0), Color = Color3.fromRGB(60, 70, 90), Material = Enum.Material.Slate, Parent = booth })
+	B.blob(booth, "BoothSnow", roof.CFrame * CFrame.new(0, 0.7, 0), Vector3.new(11, 1.8, 11), P.Snow, Enum.Material.Snow, false)
+	local guardSpot = Instance.new("Attachment")
+	guardSpot.Name = "GuardSpawn"
+	guardSpot.Parent = booth:FindFirstChild("BoothBase")
+	guardSpot.Position = Vector3.new(0, 1, 0)
+	-- Barrier arm in front of the gate.
+	B.part({ Name = "BarrierPost", Size = Vector3.new(1.4, 4, 1.4), CFrame = gateCf * CFrame.new(-(W / 2 + 1), 2, -4), Color = P.Iron, Material = Enum.Material.Metal, Parent = booth })
+	for i = 0, 7 do
+		B.part({ Name = "BarrierArm", Size = Vector3.new(W / 8, 0.8, 0.8), CFrame = gateCf * CFrame.new(-(W / 2) + (i + 0.5) * (W / 8), 3.6, -4), Color = if i % 2 == 0 then P.Red else P.Snow, Parent = booth })
+	end
+	-- Boundary walls running north and south from the gate, then east.
+	local wh = 10
+	wallRun(area, Vector3.new(x, 0.6, -(W / 2 + 7.5)), Vector3.new(x, 0.6, -260), wh, stone)
+	wallRun(area, Vector3.new(x, 0.6, W / 2 + 7.5), Vector3.new(x, 0.6, 260), wh, stone)
+	wallRun(area, Vector3.new(x, 0.6, -260), Vector3.new(x + 520, 0.6, -260), wh, stone)
+	wallRun(area, Vector3.new(x, 0.6, 260), Vector3.new(x + 520, 0.6, 260), wh, stone)
+	wallRun(area, Vector3.new(x + 520, 0.6, -260), Vector3.new(x + 520, 0.6, 260), wh, stone)
+	-- Trees lining the inside of the wall and reserved lots.
+	local rng = Random.new(77)
+	for i = 0, 12 do
+		Props.pine(area, CFrame.new(x + 30 + i * 38, 0, -236 + rng:NextNumber(-6, 6)), rng:NextNumber(22, 34), rng)
+		Props.pine(area, CFrame.new(x + 30 + i * 38, 0, 236 + rng:NextNumber(-6, 6)), rng:NextNumber(22, 34), rng)
+	end
+	for _, side in { -1, 1 } do
+		Props.pine(area, CFrame.new(x - 12, 0, side * 40), 26, rng)
+		Props.bush(area, CFrame.new(x - 8, 0, side * 28), 5)
+	end
+	futureLots(area, Vector3.new(x + 70, 0, -170), 5, 2, Vector2.new(90, 100), "GatedCommunity")
+	futureLots(area, Vector3.new(x + 70, 0, 70), 5, 2, Vector2.new(90, 100), "GatedCommunity")
+	return area
+end
+
+function Districts.mansionDistrict(map: Instance)
+	local area = B.folder("MansionDistrict", map)
+	local z = Layout.MansionGateZ
+	local W = Layout.RoadWidth
+	local stone = Color3.fromRGB(205, 200, 195)
+	local gateCf = CFrame.lookAt(Vector3.new(0, 0.6, z), Vector3.new(0, 0.6, z + 10))
+	pillar(area, gateCf * CFrame.new(-(W / 2 + 4), 0, 0), 18, stone, Color3.fromRGB(255, 220, 150))
+	pillar(area, gateCf * CFrame.new(W / 2 + 4, 0, 0), 18, stone, Color3.fromRGB(255, 220, 150))
+	ironGate(area, gateCf, W + 2, 14, Color3.fromRGB(30, 30, 34), P.Gold)
+	-- Gilded crest above the gate.
+	local crest = B.hcyl(area, "Crest", gateCf * CFrame.new(0, 22, 0) * CFrame.Angles(0, math.pi / 2, 0), 1, 8, P.Gold, Enum.Material.Metal, false)
+	B.hcyl(area, "CrestInner", crest.CFrame * CFrame.new(-0.3, 0, 0), 0.6, 5.6, P.Red, Enum.Material.SmoothPlastic, false)
+	for _, side in { -1, 1 } do
+		B.part({ Name = "CrestArm", Size = Vector3.new(W / 2, 0.8, 0.8), CFrame = gateCf * CFrame.new(side * (W / 4 + 3), 21, 0) * CFrame.Angles(0, 0, side * math.rad(-12)), Color = P.Gold, Material = Enum.Material.Metal, Parent = area })
+	end
+	-- Garland across the gate.
+	B.stringLights(area, (gateCf * CFrame.new(-(W / 2 + 4), 22, -1)).Position, (gateCf * CFrame.new(W / 2 + 4, 22, -1)).Position, 2, 2.5, 4)
+	local wh = 12
+	wallRun(area, Vector3.new(-(W / 2 + 7.5), 0.6, z), Vector3.new(-320, 0.6, z), wh, stone)
+	wallRun(area, Vector3.new(W / 2 + 7.5, 0.6, z), Vector3.new(320, 0.6, z), wh, stone)
+	wallRun(area, Vector3.new(-320, 0.6, z), Vector3.new(-320, 0.6, z - 560), wh, stone)
+	wallRun(area, Vector3.new(320, 0.6, z), Vector3.new(320, 0.6, z - 560), wh, stone)
+	wallRun(area, Vector3.new(-320, 0.6, z - 560), Vector3.new(320, 0.6, z - 560), wh, stone)
+	-- Avenue of tall trees leading up to the gate (town side).
+	local rng = Random.new(91)
+	for i = 0, 4 do
+		for _, side in { -1, 1 } do
+			Props.pine(area, CFrame.new(side * (W / 2 + 18), 0, z + 30 + i * 36), rng:NextNumber(30, 38), rng)
+		end
+	end
+	futureLots(area, Vector3.new(-200, 0, z - 140), 3, 2, Vector2.new(200, 220), "MansionDistrict")
+	return area
+end
+
+return Districts
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX00000012"><Properties><string name="Name">Environment</string><ProtectedString name="Source"><![CDATA[--!strict
+-- Lighting, terrain (ground, mountain, trail) and the road network.
+local Lighting = game:GetService("Lighting")
+local Workspace = game:GetService("Workspace")
+
+local B = require(script.Parent.Builder)
+local Props = require(script.Parent.Props)
+local Layout = require(game:GetService("ReplicatedStorage").Shared.Config.Layout)
+local P = B.Palette
+
+local Environment = {}
+
+local terrain = Workspace.Terrain
+
+function Environment.lighting()
+	Lighting.ClockTime = 0.2
+	Lighting.Brightness = 1.2
+	Lighting.Ambient = Color3.fromRGB(40, 50, 80)
+	Lighting.OutdoorAmbient = Color3.fromRGB(70, 90, 140)
+	Lighting.EnvironmentDiffuseScale = 0.4
+	Lighting.EnvironmentSpecularScale = 0.4
+	Lighting.GlobalShadows = true
+	Lighting.ShadowSoftness = 0.3
+	Lighting.GeographicLatitude = 41.7
+
+	local function ensure(className: string, name: string): Instance
+		local existing = Lighting:FindFirstChild(name)
+		if existing then
+			return existing
+		end
+		local inst = Instance.new(className :: any)
+		inst.Name = name
+		inst.Parent = Lighting
+		return inst
+	end
+
+	local atmosphere = ensure("Atmosphere", "WinterAtmosphere") :: Atmosphere
+	atmosphere.Density = 0.32
+	atmosphere.Offset = 0.15
+	atmosphere.Color = Color3.fromRGB(120, 140, 190)
+	atmosphere.Decay = Color3.fromRGB(40, 50, 90)
+	atmosphere.Glare = 0
+	atmosphere.Haze = 1.4
+
+	local sky = ensure("Sky", "NightSky") :: Sky
+	sky.StarCount = 3000
+	sky.MoonAngularSize = 14
+	sky.CelestialBodiesShown = true
+
+	local bloom = ensure("BloomEffect", "Glow") :: BloomEffect
+	bloom.Intensity = 0.8
+	bloom.Size = 28
+	bloom.Threshold = 0.95
+
+	local cc = ensure("ColorCorrectionEffect", "WinterGrade") :: ColorCorrectionEffect
+	cc.TintColor = Color3.fromRGB(225, 232, 255)
+	cc.Saturation = 0.12
+	cc.Contrast = 0.08
+	cc.Brightness = 0.02
+end
+
+-- Ground, nearby mountain with a carved switchback trail, distant peaks.
+-- Returns the trail waypoints (useful later for sleigh pathing).
+function Environment.terrain(map: Instance): { Vector3 }
+	terrain:Clear()
+	-- Snowy ground. Top surface sits at y = 0.
+	terrain:FillBlock(CFrame.new(0, -6, 150), Vector3.new(2000, 12, 2200), Enum.Material.Snow)
+
+	-- Mountain mass south of town.
+	terrain:FillBall(Vector3.new(0, -200, 860), 360, Enum.Material.Snow)
+	terrain:FillBall(Vector3.new(0, -120, 570), 200, Enum.Material.Snow)
+	terrain:FillBall(Vector3.new(-230, -150, 730), 260, Enum.Material.Snow)
+	terrain:FillBall(Vector3.new(230, -150, 730), 260, Enum.Material.Snow)
+	-- Rocky outcrops for silhouette.
+	terrain:FillBall(Vector3.new(-160, 70, 820), 70, Enum.Material.Rock)
+	terrain:FillBall(Vector3.new(170, 50, 800), 60, Enum.Material.Rock)
+
+	-- Plateau for the hideout (top at y = 130).
+	local hideout = Layout.Hideout
+	terrain:FillCylinder(CFrame.new(hideout.X, 0, hideout.Z), 260, 75, Enum.Material.Snow)
+	terrain:FillBall(Vector3.new(hideout.X, hideout.Y + 20, hideout.Z + 125), 95, Enum.Material.Rock)
+	-- Cave carved into the cliff behind the plateau.
+	terrain:FillBlock(CFrame.new(hideout.X, hideout.Y + 20, hideout.Z + 80), Vector3.new(64, 40, 110), Enum.Material.Air)
+
+	-- Switchback trail: wide ramps with snowy shoulders, carved clear above.
+	local points = {
+		Vector3.new(0, 0.6, 420),
+		Vector3.new(130, 26, 490),
+		Vector3.new(-110, 56, 555),
+		Vector3.new(120, 86, 615),
+		Vector3.new(-70, 114, 655),
+		Vector3.new(hideout.X, hideout.Y + 0.6, hideout.Z - 15),
+	}
+	local trail = B.folder("SummitTrail", map)
+	local width = Layout.RoadWidth - 6
+	for i = 1, #points - 1 do
+		local a, b = points[i], points[i + 1]
+		local len = (b - a).Magnitude
+		local cf = CFrame.lookAt((a + b) / 2, b)
+		terrain:FillBlock(cf * CFrame.new(0, -32, 0), Vector3.new(width + 22, 60, len + 24), Enum.Material.Snow)
+		terrain:FillBlock(cf * CFrame.new(0, 18, 0), Vector3.new(width + 10, 34, len + 30), Enum.Material.Air)
+		local ramp = B.part({ Name = "TrailRamp", Size = Vector3.new(width, 1.2, len + 2), CFrame = cf * CFrame.new(0, -0.6, 0), Color = P.Ice, Material = Enum.Material.Snow, Parent = trail })
+		ramp:SetAttribute("SleighPath", true)
+		-- Wooden guard posts with lanterns on the outside edge.
+		for t = 0.25, 0.75, 0.5 do
+			local postPos = (cf * CFrame.new(width / 2 + 2, 0, (t - 0.5) * len)).Position - Vector3.new(0, 0.6, 0)
+			local inward = -Vector3.new(cf.RightVector.X, 0, cf.RightVector.Z).Unit
+			Props.lamppost(trail, CFrame.lookAt(postPos, postPos + inward))
+		end
+	end
+	for i = 2, #points - 1 do
+		local p = points[i]
+		terrain:FillCylinder(CFrame.new(p.X, p.Y - 30, p.Z), 60, width * 0.9 + 8, Enum.Material.Snow)
+		terrain:FillCylinder(CFrame.new(p.X, p.Y + 18, p.Z), 34, width * 0.9 + 4, Enum.Material.Air)
+		B.vcyl(trail, "TrailTurn", CFrame.new(p - Vector3.new(0, 0.6, 0)), 1.2, width * 1.8, P.Ice, Enum.Material.Snow)
+	end
+
+	-- Distant peaks as low-cost mesh blobs (no terrain cost).
+	local far = B.folder("DistantPeaks", map)
+	local rng = Random.new(7)
+	for i = 0, 15 do
+		local a = i / 16 * math.pi * 2
+		local r = 1250 + rng:NextNumber(-80, 120)
+		local pos = Vector3.new(math.cos(a) * r, 0, math.sin(a) * r + 150)
+		local h = rng:NextNumber(260, 480)
+		local w = rng:NextNumber(500, 760)
+		B.blob(far, "Peak", CFrame.new(pos), Vector3.new(w, h * 2, w * 0.8), P.Rock, Enum.Material.Rock, false)
+		B.blob(far, "PeakSnow", CFrame.new(pos + Vector3.new(0, h * 0.55, 0)), Vector3.new(w * 0.6, h * 0.95, w * 0.5), P.Snow, Enum.Material.Snow, false)
+	end
+	return points
+end
+
+-- One straight road segment with sidewalks, center line and snowbanks.
+local function road(parent: Instance, name: string, a: Vector3, b: Vector3, opts: { sidewalks: boolean?, banks: boolean? }?)
+	local o = opts or {}
+	local m = B.model(name, parent)
+	local len = (b - a).Magnitude
+	local w = Layout.RoadWidth
+	local cf = CFrame.lookAt(Vector3.new((a.X + b.X) / 2, 0, (a.Z + b.Z) / 2), Vector3.new(b.X, 0, b.Z))
+	local surface = B.part({ Name = "Surface", Size = Vector3.new(w, 1, len), CFrame = cf * CFrame.new(0, 0.1, 0), Color = P.Road, Material = Enum.Material.Asphalt, Parent = m })
+	surface:SetAttribute("SleighPath", true)
+	-- Packed snow on the edges of the asphalt.
+	for _, side in { -1, 1 } do
+		B.part({ Name = "EdgeSnow", Size = Vector3.new(4, 1.05, len), CFrame = cf * CFrame.new(side * (w / 2 - 2), 0.12, 0), Color = P.Ice, Material = Enum.Material.Snow, CastShadow = false, Parent = m })
+	end
+	-- Dashed center line.
+	local dashes = math.floor(len / 12)
+	for i = 0, dashes - 1 do
+		B.part({ Name = "Line", Size = Vector3.new(0.6, 1.02, 5), CFrame = cf * CFrame.new(0, 0.11, -len / 2 + 6 + i * 12), Color = P.RoadLine, CanCollide = false, CastShadow = false, Parent = m })
+	end
+	if o.sidewalks ~= false then
+		for _, side in { -1, 1 } do
+			local sw = B.part({ Name = "Sidewalk", Size = Vector3.new(Layout.SidewalkWidth, 1.4, len), CFrame = cf * CFrame.new(side * (w / 2 + Layout.SidewalkWidth / 2), 0.3, 0), Color = P.Sidewalk, Material = Enum.Material.Concrete, Parent = m })
+			B.part({ Name = "Curb", Size = Vector3.new(0.6, 1.6, len), CFrame = cf * CFrame.new(side * (w / 2 + 0.3), 0.3, 0), Color = Color3.fromRGB(200, 200, 205), Material = Enum.Material.Concrete, Parent = m })
+			B.part({ Name = "SidewalkSnow", Size = Vector3.new(2, 0.3, len), CFrame = sw.CFrame * CFrame.new(-side * (Layout.SidewalkWidth / 2 - 1.2), 0.85, 0), Color = P.Snow, Material = Enum.Material.Snow, CastShadow = false, CanCollide = false, Parent = m })
+		end
+	end
+	if o.banks ~= false then
+		for _, side in { -1, 1 } do
+			local off = w / 2 + (if o.sidewalks ~= false then Layout.SidewalkWidth + 2.5 else 3)
+			Props.snowbank(m, cf * CFrame.new(side * off, 0, 0) * CFrame.Angles(0, math.pi / 2, 0), len * 0.9, 2.2)
+		end
+	end
+	return m
+end
+
+local function pad(parent: Instance, name: string, center: Vector3, size: Vector2)
+	local p = B.part({ Name = name, Size = Vector3.new(size.X, 1, size.Y), CFrame = CFrame.new(center.X, 0.1, center.Z), Color = P.Road, Material = Enum.Material.Asphalt, Parent = parent })
+	p:SetAttribute("SleighPath", true)
+	return p
+end
+
+-- Road network. Returns named nodes for future navigation / sleigh routes.
+function Environment.roads(map: Instance): { [string]: Vector3 }
+	local roads = B.folder("Roads", map)
+	local R = Layout.RingRoad
+	local W = Layout.RoadWidth
+	-- Ring road around the plaza (segments end flush at the corners).
+	-- No sidewalks on the ring itself so the side streets join it cleanly;
+	-- the plaza has its own paved border.
+	road(roads, "RingNorth", Vector3.new(-R + W / 2, 0, -R), Vector3.new(R - W / 2, 0, -R), { sidewalks = false })
+	road(roads, "RingSouth", Vector3.new(-R + W / 2, 0, R), Vector3.new(R - W / 2, 0, R), { sidewalks = false })
+	road(roads, "RingWest", Vector3.new(-R, 0, -R + W / 2), Vector3.new(-R, 0, R - W / 2), { sidewalks = false })
+	road(roads, "RingEast", Vector3.new(R, 0, -R + W / 2), Vector3.new(R, 0, R - W / 2), { sidewalks = false })
+	for _, c in { Vector3.new(-R, 0, -R), Vector3.new(R, 0, -R), Vector3.new(-R, 0, R), Vector3.new(R, 0, R) } do
+		pad(roads, "Corner", c, Vector2.new(W, W))
+	end
+
+	-- West: Holly Lane into the starter neighborhood, ending in a cul-de-sac.
+	local n = Layout.Neighborhood
+	road(roads, "HollyLane", Vector3.new(-R - W / 2, 0, n.Z), Vector3.new(n.EndX, 0, n.Z), { banks = false })
+	local cds = B.vcyl(roads, "CulDeSac", CFrame.new(n.EndX - n.CulDeSacRadius + 10, 0.1, n.Z), 1, n.CulDeSacRadius * 2, P.Road, Enum.Material.Asphalt)
+	cds:SetAttribute("SleighPath", true)
+	B.vcyl(roads, "CulDeSacIsland", CFrame.new(n.EndX - n.CulDeSacRadius + 10, 0.9, n.Z), 1.6, 22, P.Snow, Enum.Material.Snow)
+	Props.pine(roads, CFrame.new(n.EndX - n.CulDeSacRadius + 10, 1.6, n.Z), 22, Random.new(3))
+
+	-- East: Evergreen Way to the gated community entrance (continues past it).
+	road(roads, "EvergreenWay", Vector3.new(R + W / 2, 0, 0), Vector3.new(Layout.GatedEntranceX + 300, 0, 0))
+	-- North: Mansion Row toward the luxury district (continues past the gate).
+	road(roads, "MansionRow", Vector3.new(0, 0, -R - W / 2), Vector3.new(0, 0, Layout.MansionGateZ - 280))
+	-- South: Summit Road to the foot of the mountain trail.
+	road(roads, "SummitRoad", Vector3.new(0, 0, R + W / 2), Vector3.new(0, 0, 420))
+	pad(roads, "TrailHead", Vector3.new(0, 0, 420), Vector2.new(W + 10, W + 10))
+
+	return {
+		Plaza = Vector3.new(0, 0, 0),
+		NeighborhoodStart = Vector3.new(-R - W / 2, 0, n.Z),
+		CulDeSac = Vector3.new(n.EndX - n.CulDeSacRadius + 10, 0, n.Z),
+		GatedEntrance = Vector3.new(Layout.GatedEntranceX, 0, 0),
+		MansionGate = Vector3.new(0, 0, Layout.MansionGateZ),
+		TrailHead = Vector3.new(0, 0, 420),
+	}
+end
+
+return Environment
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX00000013"><Properties><string name="Name">Hideout</string><ProtectedString name="Source"><![CDATA[--!strict
+-- Area E: the mountain hideout. A cave workshop carved into the cliff behind
+-- the plateau, sleigh storage, a dog corner, and a lookout deck over town.
+-- Cave interior (world): x -32..32, y 130..170, z 725..835 (see Environment).
+local B = require(script.Parent.Builder)
+local Props = require(script.Parent.Props)
+local Layout = require(game:GetService("ReplicatedStorage").Shared.Config.Layout)
+local P = B.Palette
+
+local Hideout = {}
+
+local function lantern(parent: Instance, pos: Vector3, color: Color3?)
+	local c = color or Color3.fromRGB(255, 190, 110)
+	B.part({ Name = "Chain", Size = Vector3.new(0.2, 4, 0.2), CFrame = CFrame.new(pos + Vector3.new(0, 3, 0)), Color = P.Iron, Material = Enum.Material.Metal, CanCollide = false, Parent = parent })
+	local glow = B.part({ Name = "Lantern", Size = Vector3.new(1.4, 1.8, 1.4), CFrame = CFrame.new(pos), Color = c, Material = Enum.Material.Neon, CanCollide = false, CastShadow = false, Parent = parent })
+	B.part({ Name = "LanternCap", Size = Vector3.new(1.8, 0.4, 1.8), CFrame = CFrame.new(pos + Vector3.new(0, 1.1, 0)), Color = P.Iron, Material = Enum.Material.Metal, CanCollide = false, Parent = parent })
+	B.pointLight(glow, c, 24, 1.2, true)
+	B.tag(glow, "Flicker")
+	return glow
+end
+
+local function marker(parent: Instance, name: string, cf: CFrame, size: Vector3, tag: string)
+	local p = B.part({ Name = name, Size = size, CFrame = cf, Transparency = 1, CanCollide = false, CastShadow = false, Parent = parent })
+	p.CanQuery = false
+	p.CanTouch = false
+	B.tag(p, tag)
+	return p
+end
+
+function Hideout.build(map: Instance)
+	local area = B.folder("MountainHideout", map)
+	local h = Layout.Hideout
+	local fy = h.Y
+	local wood = Color3.fromRGB(105, 75, 50)
+	local oldWood = Color3.fromRGB(85, 70, 60)
+	local function at(x: number, y: number, z: number, yaw: number?): CFrame
+		return CFrame.new(h.X + x, fy + y, z) * CFrame.Angles(0, yaw or 0, 0)
+	end
+
+	-- Cave floor (smooth surface over the voxel floor).
+	B.part({ Name = "CaveFloor", Size = Vector3.new(62, 1, 108), CFrame = at(0, 0.1, 780), Color = Color3.fromRGB(80, 78, 84), Material = Enum.Material.Slate, Parent = area })
+	-- Plank floor in the living corner.
+	B.part({ Name = "PlankFloor", Size = Vector3.new(26, 0.3, 26), CFrame = at(-17, 0.75, 812), Color = oldWood, Material = Enum.Material.WoodPlanks, Parent = area })
+
+	-- Entrance timber frame, slightly crooked, with a hand-made sign.
+	local entrance = B.model("Entrance", area)
+	B.part({ Name = "Post", Size = Vector3.new(2.6, 26, 2.6), CFrame = at(-17, 13, 729) * CFrame.Angles(0, 0, math.rad(3)), Color = wood, Material = Enum.Material.Wood, Parent = entrance })
+	B.part({ Name = "Post", Size = Vector3.new(2.6, 26, 2.6), CFrame = at(17, 13, 729) * CFrame.Angles(0, 0, math.rad(-2)), Color = wood, Material = Enum.Material.Wood, Parent = entrance })
+	local beam = B.part({ Name = "Beam", Size = Vector3.new(40, 2.6, 2.6), CFrame = at(0, 26, 729) * CFrame.Angles(0, 0, math.rad(1.5)), Color = wood, Material = Enum.Material.Wood, Parent = entrance })
+	B.snowCap(entrance, beam, 0.6, 0)
+	local sign = B.part({ Name = "Sign", Size = Vector3.new(10, 3, 0.4), CFrame = at(0, 22, 727.6) * CFrame.Angles(0, 0, math.rad(-6)), Color = oldWood, Material = Enum.Material.WoodPlanks, Parent = entrance })
+	for _, sx in { -3.5, 3.5 } do
+		B.part({ Name = "Rope", Size = Vector3.new(0.15, 2.4, 0.15), CFrame = sign.CFrame * CFrame.new(sx, 2.2, 0), Color = Color3.fromRGB(170, 150, 110), CanCollide = false, Parent = entrance })
+	end
+	local gui = Instance.new("SurfaceGui")
+	gui.Face = Enum.NormalId.Front
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	gui.PixelsPerStud = 30
+	gui.Parent = sign
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.fromScale(1, 1)
+	label.BackgroundTransparency = 1
+	label.Text = "KEEP OUT!!"
+	label.TextScaled = true
+	label.Font = Enum.Font.Creepster
+	label.TextColor3 = Color3.fromRGB(150, 220, 90)
+	label.Parent = gui
+	lantern(entrance, (at(-14, 20, 726)).Position, Color3.fromRGB(170, 255, 120))
+	lantern(entrance, (at(14, 20, 726)).Position, Color3.fromRGB(170, 255, 120))
+	Props.snowbank(entrance, at(-24, 0, 724), 12, 4)
+	Props.snowbank(entrance, at(24, 0, 724), 12, 4)
+
+	-- Interior support beams.
+	for _, z in { 755, 785, 815 } do
+		for _, sx in { -1, 1 } do
+			B.part({ Name = "Support", Size = Vector3.new(2, 38, 2), CFrame = at(sx * 28, 19, z), Color = wood, Material = Enum.Material.Wood, Parent = area })
+		end
+		B.part({ Name = "CrossBeam", Size = Vector3.new(58, 2, 2), CFrame = at(0, 37, z), Color = wood, Material = Enum.Material.Wood, Parent = area })
+		lantern(area, (at(0, 33, z)).Position)
+	end
+
+	---------------------------------------------------------------- Workshop
+	local shop = B.model("Workshop", area)
+	local bench = B.part({ Name = "Workbench", Size = Vector3.new(16, 0.8, 5), CFrame = at(-22, 3.6, 770), Color = wood, Material = Enum.Material.WoodPlanks, Parent = shop })
+	for _, sx in { -7, 7 } do
+		for _, sz in { -2, 2 } do
+			B.part({ Name = "Leg", Size = Vector3.new(0.8, 3.4, 0.8), CFrame = bench.CFrame * CFrame.new(sx, -2, sz), Color = oldWood, Material = Enum.Material.Wood, Parent = shop })
+		end
+	end
+	B.part({ Name = "Vise", Size = Vector3.new(1.4, 1.2, 1.6), CFrame = bench.CFrame * CFrame.new(-6, 1, -1.5), Color = P.Iron, Material = Enum.Material.Metal, Parent = shop })
+	B.part({ Name = "Hammer", Size = Vector3.new(0.3, 0.3, 2.4), CFrame = bench.CFrame * CFrame.new(-2, 0.55, 0) * CFrame.Angles(0, 0.6, 0), Color = oldWood, CanCollide = false, Parent = shop })
+	B.part({ Name = "HammerHead", Size = Vector3.new(1, 0.6, 0.6), CFrame = bench.CFrame * CFrame.new(-1.3, 0.6, -1) * CFrame.Angles(0, 0.6, 0), Color = P.Iron, Material = Enum.Material.Metal, CanCollide = false, Parent = shop })
+	-- Blueprint of a sleigh pinned to the bench.
+	B.part({ Name = "Blueprint", Size = Vector3.new(4, 0.05, 3), CFrame = bench.CFrame * CFrame.new(3, 0.43, 0) * CFrame.Angles(0, -0.2, 0), Color = Color3.fromRGB(70, 110, 190), CanCollide = false, Parent = shop })
+	-- Pegboard with tools.
+	local board = B.part({ Name = "Pegboard", Size = Vector3.new(0.4, 8, 16), CFrame = at(-30.5, 8, 770), Color = Color3.fromRGB(150, 120, 80), Material = Enum.Material.WoodPlanks, Parent = shop })
+	for i = 0, 5 do
+		B.part({ Name = "Tool", Size = Vector3.new(0.3, 2.6, 0.5), CFrame = board.CFrame * CFrame.new(0.4, (i % 2) * 1.5, -6 + i * 2.4) * CFrame.Angles(0.3 * (i % 3 - 1), 0, 0), Color = if i % 2 == 0 then P.Iron else P.Red, Material = Enum.Material.Metal, CanCollide = false, Parent = shop })
+	end
+	-- Scrap pile: wheels, gears, an old ski.
+	for i = 0, 3 do
+		B.hcyl(shop, "Wheel", at(-25 + i * 2.5, 1.2 + (i % 2) * 1.6, 790) * CFrame.Angles(0, math.pi / 2, 0.5 * i), 0.6, 3 + i * 0.3, oldWood, Enum.Material.Wood)
+	end
+	B.part({ Name = "OldSki", Size = Vector3.new(0.6, 0.3, 9), CFrame = at(-28, 3, 795) * CFrame.Angles(0.9, 0.2, 0), Color = Color3.fromRGB(160, 50, 40), Parent = shop })
+	-- Future: the upgrade menu opens from here.
+	local upgradeMarker = marker(shop, "UpgradeBench", bench.CFrame * CFrame.new(0, 2, -4), Vector3.new(16, 6, 6), "UpgradeBench")
+	upgradeMarker:SetAttribute("Purpose", "Opens the upgrade shop in a later phase")
+
+	---------------------------------------------------------------- Sleigh storage
+	local garage = B.model("SleighStorage", area)
+	local deck = B.part({ Name = "SleighPlatform", Size = Vector3.new(24, 1, 38), CFrame = at(17, 0.9, 772), Color = oldWood, Material = Enum.Material.WoodPlanks, Parent = garage })
+	for _, sx in { -12.5, 12.5 } do
+		B.part({ Name = "Curb", Size = Vector3.new(1, 1.6, 38), CFrame = deck.CFrame * CFrame.new(sx, 0.8, 0), Color = wood, Material = Enum.Material.Wood, Parent = garage })
+	end
+	local sleighSpawn = Instance.new("Attachment")
+	sleighSpawn.Name = "SleighSpawn"
+	sleighSpawn.Position = Vector3.new(0, 1, 0)
+	sleighSpawn.Parent = deck
+	B.tag(deck, "SleighStorage")
+	-- Hanging harness and a tarp rolled up on hooks.
+	B.part({ Name = "Harness", Size = Vector3.new(4, 0.3, 0.3), CFrame = at(17, 10, 752), Color = Color3.fromRGB(120, 60, 40), Material = Enum.Material.Fabric, CanCollide = false, Parent = garage })
+	B.hcyl(garage, "Tarp", at(17, 14, 792), 18, 2, Color3.fromRGB(90, 110, 80), Enum.Material.Fabric, false)
+
+	---------------------------------------------------------------- Dog corner
+	local dog = B.model("DogCorner", area)
+	B.vcyl(dog, "DogBed", at(22, 1.1, 805), 1.2, 7, Color3.fromRGB(160, 60, 60), Enum.Material.Fabric)
+	B.vcyl(dog, "DogBedInner", at(22, 1.5, 805), 0.6, 5.4, Color3.fromRGB(220, 200, 170), Enum.Material.Fabric)
+	B.vcyl(dog, "Bowl", at(17, 1, 808), 0.8, 2, Color3.fromRGB(80, 120, 200), Enum.Material.Metal)
+	B.ball(dog, "Bone", (at(19, 1.2, 802)).Position, 0.8, P.Snow, nil, false)
+	local dogSpawn = Instance.new("Attachment")
+	dogSpawn.Name = "DogSpawn"
+	dogSpawn.Parent = dog:FindFirstChild("DogBed")
+
+	---------------------------------------------------------------- Living corner
+	local den = B.model("Den", area)
+	local chairCf = at(-18, 0.9, 812, math.rad(160))
+	B.part({ Name = "ChairSeat", Size = Vector3.new(5, 2, 5), CFrame = chairCf * CFrame.new(0, 1.2, 0) * CFrame.Angles(0, 0, math.rad(4)), Color = Color3.fromRGB(110, 130, 60), Material = Enum.Material.Fabric, Parent = den })
+	B.part({ Name = "ChairBack", Size = Vector3.new(5, 6, 1.2), CFrame = chairCf * CFrame.new(0, 4, 2) * CFrame.Angles(0.15, 0, math.rad(-5)), Color = Color3.fromRGB(110, 130, 60), Material = Enum.Material.Fabric, Parent = den })
+	-- Pot-bellied stove with a flickering fire.
+	B.vcyl(den, "Stove", at(-26, 3.5, 820), 5, 4.5, P.Iron, Enum.Material.Metal)
+	B.vcyl(den, "StovePipe", at(-26, 20, 820), 28, 1.2, P.Iron, Enum.Material.Metal)
+	local fire = B.part({ Name = "StoveFire", Size = Vector3.new(1.6, 1.6, 0.2), CFrame = at(-26, 3, 817.7), Color = Color3.fromRGB(255, 130, 40), Material = Enum.Material.Neon, CanCollide = false, Parent = den })
+	B.pointLight(fire, Color3.fromRGB(255, 140, 60), 18, 1.5, true)
+	B.tag(fire, "Flicker")
+	B.part({ Name = "Rug", Size = Vector3.new(12, 0.1, 9), CFrame = at(-16, 0.95, 818), Color = Color3.fromRGB(120, 50, 70), Material = Enum.Material.Fabric, CanCollide = false, Parent = den })
+
+	---------------------------------------------------------------- Loot pile
+	local loot = B.model("LootPile", area)
+	marker(loot, "LootDropZone", at(10, 3, 826), Vector3.new(24, 6, 14), "LootDropZone")
+	for i = 0, 4 do
+		B.blob(loot, "Sack", at(3 + i * 3.5, 1.8, 828 + (i % 2) * 2), Vector3.new(3, 3.4, 3), Color3.fromRGB(150, 120, 80), Enum.Material.Fabric, true)
+	end
+
+	---------------------------------------------------------------- Lookout deck
+	local look = B.model("LookoutDeck", area)
+	local deckCf = CFrame.lookAt(Vector3.new(h.X + 46, fy + 1, h.Z - 48), Vector3.new(0, fy + 1, 0))
+	local platform = B.part({ Name = "Deck", Size = Vector3.new(26, 1, 22), CFrame = deckCf, Color = oldWood, Material = Enum.Material.WoodPlanks, Parent = look })
+	B.part({ Name = "DeckSnow", Size = Vector3.new(4, 0.3, 22), CFrame = platform.CFrame * CFrame.new(-11, 0.6, 0), Color = P.Snow, Material = Enum.Material.Snow, CanCollide = false, CastShadow = false, Parent = look })
+	for _, sx in { -1, 1 } do
+		for _, sz in { -1, 1 } do
+			B.part({ Name = "Stilt", Size = Vector3.new(1.5, 30, 1.5), CFrame = platform.CFrame * CFrame.new(sx * 12, -15, sz * 10), Color = wood, Material = Enum.Material.Wood, Parent = look })
+		end
+	end
+	-- Railing on the open three sides.
+	for _, r in { { Vector3.new(26, 0.5, 0.5), Vector3.new(0, 3.5, -11) }, { Vector3.new(0.5, 0.5, 22), Vector3.new(-13, 3.5, 0) }, { Vector3.new(0.5, 0.5, 22), Vector3.new(13, 3.5, 0) } } do
+		local rail = B.part({ Name = "Rail", Size = r[1], CFrame = platform.CFrame * CFrame.new(r[2]), Color = wood, Material = Enum.Material.Wood, Parent = look })
+		B.snowCap(look, rail, 0.25, 0)
+	end
+	for i = 0, 6 do
+		B.part({ Name = "Baluster", Size = Vector3.new(0.4, 3.2, 0.4), CFrame = platform.CFrame * CFrame.new(-12 + i * 4, 2, -11), Color = wood, Material = Enum.Material.Wood, Parent = look })
+	end
+	-- Telescope pointed at town.
+	B.part({ Name = "Tripod", Size = Vector3.new(0.4, 4, 0.4), CFrame = platform.CFrame * CFrame.new(0, 2.5, -7), Color = oldWood, Parent = look })
+	B.hcyl(look, "Telescope", platform.CFrame * CFrame.new(0, 4.8, -8) * CFrame.Angles(0, math.pi / 2, math.rad(-8)), 4.5, 1, P.Gold, Enum.Material.Metal, false)
+	B.stringLights(look, (platform.CFrame * CFrame.new(-13, 4, -11)).Position, (platform.CFrame * CFrame.new(13, 4, -11)).Position, 2, 0.6, 4)
+	local launch = marker(look, "SleighLaunch", platform.CFrame * CFrame.new(0, 2, 0), Vector3.new(20, 4, 18), "SleighLaunch")
+	launch:SetAttribute("Purpose", "Future sleigh take-off point")
+
+	-- Trail-end signpost.
+	Props.streetSign(area, at(-30, 0, h.Z - 8) * CFrame.Angles(0, math.rad(30), 0), "Hideout")
+	-- Plateau trees.
+	local rng = Random.new(101)
+	for _, deg in { -20, 0, 20, 40, 140, 160, 180 } do
+		local a = math.rad(deg)
+		Props.pine(area, CFrame.new(h.X + math.cos(a) * 62, fy, h.Z + math.sin(a) * 62 + 10), rng:NextNumber(18, 28), rng)
+	end
+	return area
+end
+
+return Hideout
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX00000014"><Properties><string name="Name">HouseParts</string><ProtectedString name="Source"><![CDATA[--!strict
+-- Shared house details: windows, doors, chimneys, eave lights, yards.
+local B = require(script.Parent.Builder)
+local Props = require(script.Parent.Props)
+local P = B.Palette
+
+local HouseParts = {}
+
+-- Window centered on `cf` (cf faces outward along its LookVector).
+-- `lit` = glowing neon pane (exterior-only houses). Otherwise glass that lets
+-- interior light show through.
+function HouseParts.window(parent: Instance, cf: CFrame, w: number, h: number, trim: Color3, lit: boolean, round: boolean?)
+	local m = B.model("Window", parent)
+	if round then
+		local d = math.min(w, h)
+		B.hcyl(m, "Frame", cf * CFrame.Angles(0, math.pi / 2, 0) * CFrame.new(0.15, 0, 0), 1.2, d + 0.8, trim, Enum.Material.Wood)
+		B.hcyl(m, "Pane", cf * CFrame.Angles(0, math.pi / 2, 0) * CFrame.new(0.5, 0, 0), 1.2, d, P.Window, if lit then Enum.Material.Neon else Enum.Material.Glass)
+		B.part({ Name = "Mullion", Size = Vector3.new(0.25, d, 0.3), CFrame = cf * CFrame.new(0, 0, -0.3), Color = trim, CanCollide = false, Parent = m })
+		B.part({ Name = "Mullion", Size = Vector3.new(d, 0.25, 0.3), CFrame = cf * CFrame.new(0, 0, -0.3), Color = trim, CanCollide = false, Parent = m })
+		return m
+	end
+	local pane = B.part({
+		Name = "Pane",
+		Size = Vector3.new(w, h, 0.3),
+		CFrame = cf,
+		Color = P.Window,
+		Material = if lit then Enum.Material.Neon else Enum.Material.Glass,
+		Transparency = if lit then 0 else 0.45,
+		CastShadow = false,
+		Parent = m,
+	})
+	pane:SetAttribute("WindowPane", true)
+	local t = 0.6
+	for _, side in { -1, 1 } do
+		B.part({ Name = "FrameSide", Size = Vector3.new(t, h + t * 2, 1), CFrame = cf * CFrame.new(side * (w / 2 + t / 2), 0, -0.2), Color = trim, Material = Enum.Material.Wood, Parent = m })
+		B.part({ Name = "Shutter", Size = Vector3.new(w * 0.32, h + 0.4, 0.3), CFrame = cf * CFrame.new(side * (w / 2 + t + w * 0.17), 0, -0.45), Color = trim:Lerp(Color3.new(0, 0, 0), 0.35), Material = Enum.Material.Wood, Parent = m })
+	end
+	B.part({ Name = "FrameTop", Size = Vector3.new(w + t * 2, t, 1), CFrame = cf * CFrame.new(0, h / 2 + t / 2, -0.2), Color = trim, Material = Enum.Material.Wood, Parent = m })
+	local sill = B.part({ Name = "Sill", Size = Vector3.new(w + 1.6, 0.4, 1.6), CFrame = cf * CFrame.new(0, -h / 2 - 0.2, -0.5), Color = trim, Material = Enum.Material.Wood, Parent = m })
+	B.snowCap(m, sill, 0.3, -0.2)
+	B.part({ Name = "MullionV", Size = Vector3.new(0.25, h, 0.35), CFrame = cf * CFrame.new(0, 0, -0.05), Color = trim, CanCollide = false, Parent = m })
+	B.part({ Name = "MullionH", Size = Vector3.new(w, 0.25, 0.35), CFrame = cf * CFrame.new(0, 0, -0.05), Color = trim, CanCollide = false, Parent = m })
+	return m
+end
+
+-- Front door. `cf` = bottom center of the doorway, facing outward.
+-- When `open` is true the door is swung inward so players can walk in
+-- (interactive doors come in a later phase; the model is tagged for it).
+function HouseParts.door(parent: Instance, cf: CFrame, w: number, h: number, color: Color3, trim: Color3, open: boolean?): Model
+	local m = B.model("FrontDoor", parent)
+	B.tag(m, "FutureDoor")
+	for _, side in { -1, 1 } do
+		B.part({ Name = "Jamb", Size = Vector3.new(0.7, h + 0.7, 1.4), CFrame = cf * CFrame.new(side * (w / 2 + 0.35), h / 2 + 0.35, -0.1), Color = trim, Material = Enum.Material.Wood, Parent = m })
+	end
+	B.part({ Name = "Header", Size = Vector3.new(w + 1.4, 0.8, 1.4), CFrame = cf * CFrame.new(0, h + 0.4, -0.1), Color = trim, Material = Enum.Material.Wood, Parent = m })
+	local slabCf
+	if open then
+		-- Hinged on the right, swung ~100 degrees inward and out of the way.
+		slabCf = cf * CFrame.new(w / 2, 0, 0.3) * CFrame.Angles(0, math.rad(100), 0) * CFrame.new(-w / 2, h / 2, 0)
+	else
+		slabCf = cf * CFrame.new(0, h / 2, 0.3)
+	end
+	local slab = B.part({ Name = "Slab", Size = Vector3.new(w, h, 0.4), CFrame = slabCf, Color = color, Material = Enum.Material.Wood, Parent = m })
+	for _, py in { -0.25, 0.25 } do
+		B.part({ Name = "Panel", Size = Vector3.new(w * 0.65, h * 0.3, 0.1), CFrame = slab.CFrame * CFrame.new(0, py * h, -0.22), Color = color:Lerp(Color3.new(0, 0, 0), 0.15), CanCollide = false, Parent = m })
+	end
+	B.ball(m, "Knob", (slab.CFrame * CFrame.new(w / 2 - 0.6, 0, -0.35)).Position, 0.35, P.Gold, Enum.Material.Metal, false)
+	Props.wreath(m, slab.CFrame * CFrame.new(0, h * 0.27, -0.45), 2.2)
+	-- Step and welcome light.
+	local step = B.part({ Name = "Step", Size = Vector3.new(w + 3, 1, 3), CFrame = cf * CFrame.new(0, -0.5, -1.8), Color = P.Stone, Material = Enum.Material.Cobblestone, Parent = m })
+	B.snowCap(m, step, 0.2, -0.6)
+	local lamp = B.part({ Name = "PorchLamp", Size = Vector3.new(0.8, 1.2, 0.8), CFrame = cf * CFrame.new(w / 2 + 1.6, h * 0.75, -0.7), Color = P.Window, Material = Enum.Material.Neon, CanCollide = false, Parent = m })
+	B.pointLight(lamp, P.WarmLight, 14, 1)
+	m:SetAttribute("Width", w)
+	m:SetAttribute("Height", h)
+	return m
+end
+
+-- Brick chimney from `base` (ground point) up to `height`, with snow and a
+-- marker attachment at the top for future chimney entry.
+function HouseParts.chimney(parent: Instance, base: CFrame, height: number, width: number?, color: Color3?)
+	local w = width or 4
+	local m = B.model("Chimney", parent)
+	local stack = B.part({ Name = "Stack", Size = Vector3.new(w, height, w), CFrame = base * CFrame.new(0, height / 2, 0), Color = color or Color3.fromRGB(150, 70, 60), Material = Enum.Material.Brick, Parent = m })
+	local cap = B.part({ Name = "Cap", Size = Vector3.new(w + 1, 0.8, w + 1), CFrame = stack.CFrame * CFrame.new(0, height / 2 + 0.4, 0), Color = P.Stone, Material = Enum.Material.Concrete, Parent = m })
+	B.part({ Name = "Snow", Size = Vector3.new(w + 1.2, 0.5, w + 1.2), CFrame = cap.CFrame * CFrame.new(0, 0.6, 0), Color = P.Snow, Material = Enum.Material.Snow, CastShadow = false, Parent = m })
+	local entry = Instance.new("Attachment")
+	entry.Name = "ChimneyEntry"
+	entry.Parent = cap
+	entry.Position = Vector3.new(0, 1, 0)
+	B.tag(cap, "ChimneyEntry")
+	return m
+end
+
+-- Front yard: walkway, driveway, mailbox, fence, trees and a decoration.
+-- `lot` = point on the sidewalk edge in front of the house, LookVector toward the road.
+-- `walkTo` = local Z where the front door is (negative = toward road from house center).
+export type YardOpts = {
+	width: number,
+	depth: number,
+	doorX: number,
+	doorZ: number,
+	driveX: number,
+	mailboxColor: Color3,
+	fenceColor: Color3?,
+	decoration: string?, -- "snowman" | "candycanes" | "presents"
+	seed: number,
+}
+function HouseParts.yard(parent: Instance, lot: CFrame, o: YardOpts)
+	local m = B.model("Yard", parent)
+	local rng = Random.new(o.seed)
+	-- Local frame: LookVector toward road, so "toward road" is local -Z.
+	-- Walkway from sidewalk to front door.
+	local walkLen = o.doorZ
+	B.part({ Name = "Walkway", Size = Vector3.new(5, 1, walkLen), CFrame = lot * CFrame.new(o.doorX, 0.15, walkLen / 2), Color = P.Stone, Material = Enum.Material.Cobblestone, Parent = m })
+	-- Driveway.
+	local driveLen = o.doorZ - 1
+	local drive = B.part({ Name = "Driveway", Size = Vector3.new(16, 1, driveLen), CFrame = lot * CFrame.new(o.driveX, 0.12, driveLen / 2), Color = Color3.fromRGB(95, 95, 102), Material = Enum.Material.Concrete, Parent = m })
+	drive:SetAttribute("SleighPath", true)
+	for _, side in { -1, 1 } do
+		B.part({ Name = "DriveSnow", Size = Vector3.new(1.5, 1.05, drive.Size.Z), CFrame = drive.CFrame * CFrame.new(side * 7.25, 0.03, 0), Color = P.Ice, Material = Enum.Material.Snow, CastShadow = false, Parent = m })
+	end
+	-- Mailbox beside the walkway.
+	Props.mailbox(m, lot * CFrame.new(o.doorX + 5, 0, 2) * CFrame.Angles(0, math.pi, 0), o.mailboxColor)
+	-- Low fence along the front, gapped for the walkway and driveway.
+	local half = o.width / 2
+	local gaps = { { o.doorX - 3, o.doorX + 3 }, { o.driveX - 9, o.driveX + 9 } }
+	table.sort(gaps, function(a, b)
+		return a[1] < b[1]
+	end)
+	local cursor = -half
+	for _, g in gaps do
+		local len = g[1] - cursor
+		if len > 2 then
+			Props.fence(m, lot * CFrame.new(cursor + len / 2, 0, 1.5), len, o.fenceColor)
+		end
+		cursor = g[2]
+	end
+	if half - cursor > 2 then
+		Props.fence(m, lot * CFrame.new(cursor + (half - cursor) / 2, 0, 1.5), half - cursor, o.fenceColor)
+	end
+	-- Trees in the back corners and along the sides.
+	for _, sx in { -1, 1 } do
+		Props.pine(m, lot * CFrame.new(sx * (half - 6), 0, o.depth - 6), rng:NextNumber(20, 30), rng)
+		if math.abs(sx * (half - 7) - o.driveX) > 14 then
+			Props.pine(m, lot * CFrame.new(sx * (half - 7), 0, 12), rng:NextNumber(12, 16), rng)
+		end
+	end
+	-- Bushes along the walkway.
+	for i = 1, 2 do
+		Props.bush(m, lot * CFrame.new(o.doorX - 5, 0, o.doorZ * (i / 3)), 3.2)
+		Props.bush(m, lot * CFrame.new(o.doorX + 5, 0, o.doorZ * (i / 3) + 3), 3)
+	end
+	-- Yard decoration.
+	local decoX = if o.driveX > o.doorX then o.doorX - 13 else o.doorX + 13
+	if o.decoration == "snowman" then
+		Props.snowman(m, lot * CFrame.new(decoX, 0, o.doorZ * 0.45) * CFrame.Angles(0, math.pi, 0))
+	elseif o.decoration == "candycanes" then
+		for i = 0, 3 do
+			Props.candyCane(m, lot * CFrame.new(o.doorX - 3.4, 0, 4 + i * (o.doorZ - 6) / 3), 4)
+			Props.candyCane(m, lot * CFrame.new(o.doorX + 3.4, 0, 4 + i * (o.doorZ - 6) / 3) * CFrame.Angles(0, math.pi, 0), 4)
+		end
+	elseif o.decoration == "presents" then
+		local colors = { P.Red, P.Green, Color3.fromRGB(70, 110, 210), P.Gold }
+		for i = 1, 4 do
+			Props.present(m, lot * CFrame.new(decoX + rng:NextNumber(-3, 3), 0, o.doorZ * 0.45 + rng:NextNumber(-3, 3)) * CFrame.Angles(0, rng:NextNumber(0, 3), 0), Vector3.new(2.5, 2, 2.5) * rng:NextNumber(0.9, 1.6), colors[i])
+		end
+	end
+	-- Snow mounds for a natural, uneven yard.
+	for _ = 1, 4 do
+		local x = rng:NextNumber(-half + 4, half - 4)
+		if math.abs(x - o.driveX) > 10 and math.abs(x - o.doorX) > 5 then
+			B.blob(m, "SnowMound", lot * CFrame.new(x, 0, rng:NextNumber(6, o.doorZ - 6)), Vector3.new(rng:NextNumber(6, 12), 2, rng:NextNumber(5, 9)), P.Snow, Enum.Material.Snow, false)
+		end
+	end
+	return m
+end
+
+-- String lights along a horizontal edge given in the house's local frame.
+function HouseParts.eaveLights(parent: Instance, house: CFrame, a: Vector3, b: Vector3, lightEvery: number?)
+	return B.stringLights(parent, (house * CFrame.new(a)).Position, (house * CFrame.new(b)).Position, 2.4, 0.5, lightEvery or 8)
+end
+
+-- Invisible marker where a future present can spawn.
+function HouseParts.presentSpot(parent: Instance, cf: CFrame, room: string)
+	local spot = B.part({ Name = "PresentSpot", Size = Vector3.new(2, 0.2, 2), CFrame = cf * CFrame.new(0, 0.1, 0), Transparency = 1, CanCollide = false, CastShadow = false, Parent = parent })
+	spot.CanQuery = false
+	spot.CanTouch = false
+	spot:SetAttribute("Room", room)
+	B.tag(spot, "PresentSpot")
+	return spot
+end
+
+return HouseParts
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX00000015"><Properties><string name="Name">Houses</string><ProtectedString name="Source"><![CDATA[--!strict
+-- The five starter-neighborhood houses. Each builder takes `lot`: a point on
+-- the sidewalk edge in front of the property whose LookVector faces the road.
+-- In each house's local frame, local -Z is the front (toward the road).
+local B = require(script.Parent.Builder)
+local Props = require(script.Parent.Props)
+local HP = require(script.Parent.HouseParts)
+local Interior = require(script.Parent.Interior)
+local P = B.Palette
+
+local Houses = {}
+
+local function foundation(m: Instance, H: CFrame, w: number, d: number, color: Color3?)
+	B.part({ Name = "Foundation", Size = Vector3.new(w + 1, 1.2, d + 1), CFrame = H * CFrame.new(0, 0.5, 0), Color = color or P.Stone, Material = Enum.Material.Cobblestone, Parent = m })
+end
+
+-------------------------------------------------------------------------------
+-- 1. Holly Cottage: brick cottage with a full, furnished interior.
+-------------------------------------------------------------------------------
+function Houses.hollyCottage(parent: Instance, lot: CFrame): Model
+	local m = B.model("HollyCottage", parent)
+	m:SetAttribute("HasInterior", true)
+	local W, D, WH = 56, 40, 14 -- width, depth, wall height
+	local setback = 34
+	local H = lot * CFrame.new(0, 0, setback + D / 2)
+	local wallColor = Color3.fromRGB(168, 74, 62)
+	local trim = Color3.fromRGB(245, 238, 222)
+	local exterior = B.model("Exterior", m)
+
+	foundation(exterior, H, W, D)
+	local floorY = 1.1
+	local function wallOrigin(x: number, z: number, alongZ: boolean): CFrame
+		local cf = H * CFrame.new(x, floorY, z)
+		return if alongZ then cf * CFrame.Angles(0, -math.pi / 2, 0) else cf
+	end
+
+	-- Exterior walls with openings (offsets from the wall's start).
+	local doorOpening = { x = 22, w = 6, y = 0, h = 9 } -- x -6..0, lines up with the hallway
+	B.wall(exterior, "WallFront", wallOrigin(-W / 2, -D / 2, false), W, WH, 1, wallColor, Enum.Material.Brick, {
+		doorOpening,
+		{ x = 4, w = 10, y = 4, h = 6 },
+		{ x = 38, w = 10, y = 4, h = 6 },
+	})
+	B.wall(exterior, "WallBack", wallOrigin(-W / 2, D / 2, false), W, WH, 1, wallColor, Enum.Material.Brick, {
+		{ x = 6, w = 8, y = 4, h = 6 },
+		{ x = 38, w = 10, y = 4, h = 6 },
+	})
+	B.wall(exterior, "WallLeft", wallOrigin(-W / 2, -D / 2, true), D, WH, 1, wallColor, Enum.Material.Brick, {
+		{ x = 30, w = 6, y = 4, h = 6 },
+	})
+	B.wall(exterior, "WallRight", wallOrigin(W / 2, -D / 2, true), D, WH, 1, wallColor, Enum.Material.Brick, {
+		{ x = 6, w = 8, y = 4, h = 6 },
+		{ x = 30, w = 6, y = 4, h = 6 },
+	})
+	-- Corner trim posts.
+	for _, sx in { -1, 1 } do
+		for _, sz in { -1, 1 } do
+			B.part({ Name = "CornerTrim", Size = Vector3.new(1.4, WH, 1.4), CFrame = H * CFrame.new(sx * W / 2, floorY + WH / 2, sz * D / 2), Color = trim, Material = Enum.Material.Wood, Parent = exterior })
+		end
+	end
+	-- Fascia board under the eaves.
+	for _, sz in { -1, 1 } do
+		B.part({ Name = "Fascia", Size = Vector3.new(W + 2, 1, 1.4), CFrame = H * CFrame.new(0, floorY + WH - 0.5, sz * (D / 2 + 0.2)), Color = trim, Material = Enum.Material.Wood, Parent = exterior })
+	end
+
+	-- Windows (glass, so the warm interior light shows).
+	local function win(x: number, y: number, z: number, faceYaw: number, w: number, h: number)
+		HP.window(exterior, H * CFrame.new(x, floorY + y, z) * CFrame.Angles(0, faceYaw, 0), w, h, trim, false)
+	end
+	-- Window panes sit in the wall plane; frames stick outward (local -Z of the window cf).
+	win(-W / 2 + 9, 7, -D / 2, 0, 10, 6)
+	win(-W / 2 + 43, 7, -D / 2, 0, 10, 6)
+	win(-W / 2 + 10, 7, D / 2, math.pi, 8, 6)
+	win(-W / 2 + 43, 7, D / 2, math.pi, 10, 6)
+	win(-W / 2, 7, -D / 2 + 33, math.pi / 2, 6, 6)
+	win(W / 2, 7, -D / 2 + 10, -math.pi / 2, 8, 6)
+	win(W / 2, 7, -D / 2 + 33, -math.pi / 2, 6, 6)
+
+	-- Front door, swung open so players can walk in during Free Roam.
+	HP.door(exterior, H * CFrame.new(-W / 2 + doorOpening.x + doorOpening.w / 2, floorY, -D / 2), 6, 9, Color3.fromRGB(40, 100, 70), trim, true)
+
+	-- Ceiling / attic floor and roof.
+	B.part({ Name = "Ceiling", Size = Vector3.new(W, 0.6, D), CFrame = H * CFrame.new(0, floorY + WH + 0.3, 0), Color = Color3.fromRGB(240, 232, 215), Material = Enum.Material.SmoothPlastic, Parent = exterior })
+	B.gableRoof(exterior, H * CFrame.new(0, floorY + WH + 0.6, 0), W, D, 12, 2.5, Color3.fromRGB(60, 70, 90), wallColor)
+	HP.chimney(exterior, H * CFrame.new(-W / 2 - 3, floorY, -8), WH + 16, 5) -- outside the wall, behind the fireplace
+
+	-- Eave lights along the front and back.
+	HP.eaveLights(exterior, H, Vector3.new(-W / 2 - 1, floorY + WH - 1.2, -D / 2 - 1.2), Vector3.new(W / 2 + 1, floorY + WH - 1.2, -D / 2 - 1.2))
+	HP.eaveLights(exterior, H, Vector3.new(-W / 2 - 1, floorY + WH - 1.2, D / 2 + 1.2), Vector3.new(W / 2 + 1, floorY + WH - 1.2, D / 2 + 1.2), 0)
+
+	Interior.build(m, H, { width = W, depth = D, wallHeight = WH, floorY = floorY, trim = trim })
+
+	HP.yard(m, lot, { width = 84, depth = setback + D + 14, doorX = -3, doorZ = setback, driveX = 32, mailboxColor = P.Red, decoration = "snowman", seed = 11 })
+	return m
+end
+
+-------------------------------------------------------------------------------
+-- 2. Crooked Spire: round two-storey tower with a leaning, curling spire.
+-------------------------------------------------------------------------------
+function Houses.crookedSpire(parent: Instance, lot: CFrame): Model
+	local m = B.model("CrookedSpire", parent)
+	local setback = 34
+	local R = 17
+	local H = lot * CFrame.new(-6, 0, setback + R)
+	local body = Color3.fromRGB(60, 150, 160)
+	local trim = Color3.fromRGB(250, 220, 120)
+	B.vcyl(m, "Foundation", H * CFrame.new(0, 0.5, 0), 1.2, R * 2 + 1.5, P.Stone, Enum.Material.Cobblestone)
+	local tower = B.vcyl(m, "Tower", H * CFrame.new(0, 1.1 + 13, 0), 26, R * 2, body, Enum.Material.Plaster)
+	-- Band between storeys and a snowy ledge.
+	B.vcyl(m, "Band", H * CFrame.new(0, 13, 0), 1, R * 2 + 1.2, trim, Enum.Material.Wood)
+	B.vcyl(m, "Eave", H * CFrame.new(0, 27.4, 0), 1, R * 2 + 4, trim, Enum.Material.Wood)
+	B.vcyl(m, "EaveSnow", H * CFrame.new(0, 28.2, 0), 0.6, R * 2 + 3.6, P.Snow, Enum.Material.Snow)
+	-- Windows around the tower on both storeys.
+	for storey = 0, 1 do
+		for i = 0, 5 do
+			local a = i / 6 * math.pi * 2 + storey * 0.5
+			if not (storey == 0 and i == 0) then
+				local cf = H * CFrame.Angles(0, a, 0) * CFrame.new(0, 7 + storey * 12, -R - 0.1)
+				HP.window(m, cf, 4, 5.5, trim, true)
+			end
+		end
+	end
+	HP.door(m, H * CFrame.new(0, 1.1, -R + 0.2), 6, 9, Color3.fromRGB(120, 40, 90), trim, false)
+	-- Leaning spire: stacked tapering drums, each tilted a bit more.
+	local cf = H * CFrame.new(0, 28.5, 0)
+	local d = R * 2 + 2
+	local tiers = 8
+	for i = 1, tiers do
+		local h = 3.4
+		d *= 0.78
+		cf = cf * CFrame.new(0, h / 2, 0)
+		local drum = B.vcyl(m, "Spire", cf, h, d, if i % 2 == 0 then Color3.fromRGB(110, 60, 140) else Color3.fromRGB(140, 80, 170), Enum.Material.Slate)
+		if i <= 5 then
+			B.vcyl(m, "SpireSnow", cf * CFrame.new(0, h / 2 + 0.2, 0), 0.5, d * 0.92, P.Snow, Enum.Material.Snow, false)
+		end
+		drum.CanCollide = i <= 3
+		cf = cf * CFrame.new(0, h / 2, 0) * CFrame.Angles(0, 0, math.rad(7)) * CFrame.new(0.6, 0, 0)
+	end
+	local star = B.ball(m, "SpireOrnament", (cf * CFrame.new(0, 1.4, 0)).Position, 2.4, P.Gold, Enum.Material.Neon, false)
+	B.pointLight(star, P.Gold, 18, 1)
+	B.tag(star, "XmasBulb")
+	-- Garland spiral of lights around the tower.
+	local prev: Vector3? = nil
+	for i = 0, 24 do
+		local a = i / 24 * math.pi * 2
+		local p = (H * CFrame.Angles(0, a, 0) * CFrame.new(0, 26.4, -R - 1.2)).Position
+		if prev then
+			B.stringLights(m, prev, p, 2.4, 0.5, if i % 4 == 0 then 4 else 0)
+		end
+		prev = p
+	end
+	-- Single-storey annex with a flat snowy roof.
+	local annex = B.part({ Name = "Annex", Size = Vector3.new(18, 12, 16), CFrame = H * CFrame.new(R + 6, 7.1, 2), Color = body:Lerp(Color3.new(1, 1, 1), 0.15), Material = Enum.Material.Plaster, Parent = m })
+	local annexRoof = B.part({ Name = "AnnexRoof", Size = Vector3.new(20, 1, 18), CFrame = annex.CFrame * CFrame.new(0, 6.5, 0), Color = trim, Material = Enum.Material.Wood, Parent = m })
+	B.blob(m, "AnnexSnow", annexRoof.CFrame * CFrame.new(0, 0.6, 0), Vector3.new(19, 2.2, 17), P.Snow, Enum.Material.Snow, false)
+	HP.window(m, annex.CFrame * CFrame.new(1, 0.5, -8.05), 6, 5, trim, true)
+	HP.chimney(m, H * CFrame.new(R + 11, 1, 6), 18, 3.5)
+	HP.yard(m, lot, { width = 84, depth = setback + R * 2 + 12, doorX = -6, doorZ = setback + 1, driveX = 28, mailboxColor = Color3.fromRGB(60, 150, 160), decoration = "presents", seed = 22 })
+	return m
+end
+
+-------------------------------------------------------------------------------
+-- 3. Gingerbread Lodge: steep A-frame with frosting trim and gumdrops.
+-------------------------------------------------------------------------------
+function Houses.gingerbreadLodge(parent: Instance, lot: CFrame): Model
+	local m = B.model("GingerbreadLodge", parent)
+	local W, D = 34, 36
+	local setback = 32
+	local H = lot * CFrame.new(-4, 0, setback + D / 2)
+	local ginger = Color3.fromRGB(176, 104, 54)
+	local frosting = Color3.fromRGB(255, 250, 245)
+	foundation(m, H, W, D, Color3.fromRGB(120, 80, 60))
+	-- Short knee walls; the roof does most of the work.
+	local body = B.part({ Name = "Body", Size = Vector3.new(W, 8, D), CFrame = H * CFrame.new(0, 5.1, 0), Color = ginger, Material = Enum.Material.Wood, Parent = m })
+	-- Steep roof: ridge runs front-to-back, so rotate the gable builder 90 degrees.
+	local roofBase = H * CFrame.new(0, 9.1, 0) * CFrame.Angles(0, math.pi / 2, 0)
+	B.gableRoof(m, roofBase, D, W, 24, 3, Color3.fromRGB(110, 60, 35), ginger)
+	-- Frosting drips along both roof edges (a row of small balls).
+	for _, side in { -1, 1 } do
+		for i = 0, 14 do
+			local z = -D / 2 - 2 + i * ((D + 4) / 14)
+			B.ball(m, "Frosting", (H * CFrame.new(side * (W / 2 + 2.6), 8.6, z)).Position, 1.4, frosting, Enum.Material.SmoothPlastic, false)
+		end
+	end
+	-- Gumdrops along the ridge.
+	local gum = { P.Red, P.Green, Color3.fromRGB(250, 200, 60), Color3.fromRGB(200, 90, 200), Color3.fromRGB(80, 150, 255) }
+	for i = 0, 6 do
+		local z = -D / 2 + 1 + i * ((D - 2) / 6)
+		local g = B.ball(m, "Gumdrop", (H * CFrame.new(0, 9.1 + 24 + 1.4, z)).Position, 2.2, gum[(i % #gum) + 1], Enum.Material.Glass, false)
+		g.Transparency = 0.1
+	end
+	-- Front gable face: big round window and frosting outline.
+	HP.window(m, H * CFrame.new(0, 20, -D / 2 - 0.5), 7, 7, frosting, true, true)
+	-- Gable trim: frosting balls along the two rake edges.
+	for _, side in { -1, 1 } do
+		for i = 0, 10 do
+			local t = i / 10
+			local x = side * (W / 2 + 1) * (1 - t)
+			local y = 9.1 + 24 * t
+			B.ball(m, "Frosting", (H * CFrame.new(x, y, -D / 2 - 2.2)).Position, 1.1, frosting, nil, false)
+		end
+	end
+	HP.door(m, H * CFrame.new(0, 1.1, -D / 2), 6, 8, Color3.fromRGB(220, 60, 70), frosting, false)
+	for _, sx in { -1, 1 } do
+		HP.window(m, H * CFrame.new(sx * 10, 5.5, -D / 2 - 0.1), 5, 4, frosting, true)
+		HP.window(m, H * CFrame.new(sx * (W / 2 + 0.1), 5.5, 4) * CFrame.Angles(0, -sx * math.pi / 2, 0), 6, 4, frosting, true)
+	end
+	-- Peppermint discs beside the door.
+	for _, sx in { -1, 1 } do
+		local disc = B.hcyl(m, "Peppermint", H * CFrame.new(sx * 5.5, 4.5, -D / 2 - 0.4) * CFrame.Angles(0, math.pi / 2, 0), 0.4, 3, P.Snow, nil, false)
+		B.part({ Name = "Stripe", Size = Vector3.new(0.45, 2.8, 0.6), CFrame = disc.CFrame, Color = P.Red, CanCollide = false, Parent = m })
+		B.part({ Name = "Stripe", Size = Vector3.new(0.45, 0.6, 2.8), CFrame = disc.CFrame, Color = P.Red, CanCollide = false, Parent = m })
+	end
+	HP.chimney(m, H * CFrame.new(W / 4, 1, D / 4), 34, 3.5, Color3.fromRGB(240, 240, 240))
+	HP.eaveLights(m, H, Vector3.new(-W / 2 - 3, 8.2, -D / 2 - 2), Vector3.new(-W / 2 - 3, 8.2, D / 2 + 2))
+	HP.eaveLights(m, H, Vector3.new(W / 2 + 3, 8.2, -D / 2 - 2), Vector3.new(W / 2 + 3, 8.2, D / 2 + 2))
+	HP.yard(m, lot, { width = 84, depth = setback + D + 12, doorX = -4, doorZ = setback, driveX = -30, mailboxColor = Color3.fromRGB(176, 104, 54), fenceColor = Color3.fromRGB(240, 120, 130), decoration = "candycanes", seed = 33 })
+	return m
+end
+
+-------------------------------------------------------------------------------
+-- 4. Twin Domes: mint house with two snowy onion domes.
+-------------------------------------------------------------------------------
+function Houses.twinDomes(parent: Instance, lot: CFrame): Model
+	local m = B.model("TwinDomes", parent)
+	local W, D, WH = 50, 32, 16
+	local setback = 34
+	local H = lot * CFrame.new(4, 0, setback + D / 2)
+	local body = Color3.fromRGB(150, 210, 180)
+	local domeColor = Color3.fromRGB(230, 120, 150)
+	local trim = Color3.fromRGB(255, 255, 255)
+	foundation(m, H, W, D)
+	B.part({ Name = "Body", Size = Vector3.new(W, WH, D), CFrame = H * CFrame.new(0, 1.1 + WH / 2, 0), Color = body, Material = Enum.Material.Plaster, Parent = m })
+	local roof = B.part({ Name = "Roof", Size = Vector3.new(W + 3, 1.2, D + 3), CFrame = H * CFrame.new(0, 1.1 + WH + 0.6, 0), Color = trim, Material = Enum.Material.Wood, Parent = m })
+	B.snowCap(m, roof, 0.8, -0.5)
+	for _, sx in { -1, 1 } do
+		local base = H * CFrame.new(sx * 12, 1.1 + WH + 1.2, 0)
+		B.vcyl(m, "Drum", base * CFrame.new(0, 2, 0), 4, 18, body:Lerp(Color3.new(1, 1, 1), 0.3), Enum.Material.Plaster)
+		local dome = B.blob(m, "Dome", base * CFrame.new(0, 9, 0), Vector3.new(19, 18, 19), domeColor, Enum.Material.SmoothPlastic, true)
+		B.blob(m, "DomeSnow", dome.CFrame * CFrame.new(0, 4.5, 0), Vector3.new(15, 9, 15), P.Snow, Enum.Material.Snow, false)
+		B.vcyl(m, "Finial", base * CFrame.new(0, 20, 0), 4, 0.8, P.Gold, Enum.Material.Metal, false)
+		local orb = B.ball(m, "FinialOrb", (base * CFrame.new(0, 22.5, 0)).Position, 1.6, P.Gold, Enum.Material.Neon, false)
+		B.tag(orb, "XmasBulb")
+		-- Round windows on each drum.
+		HP.window(m, base * CFrame.new(0, 2, -9.1), 3, 3, trim, true, true)
+		-- Lights around the drum base.
+		local prev: Vector3? = nil
+		for i = 0, 12 do
+			local a = i / 12 * math.pi * 2
+			local p = (base * CFrame.Angles(0, a, 0) * CFrame.new(0, 4.2, -9.6)).Position
+			if prev then
+				B.stringLights(m, prev, p, 2.2, 0.3, if i % 4 == 0 then 4 else 0)
+			end
+			prev = p
+		end
+	end
+	-- Arched windows (round tops) along the front.
+	for _, x in { -18, -9, 9, 18 } do
+		HP.window(m, H * CFrame.new(x, 8, -D / 2 - 0.1), 5, 6, trim, true)
+		B.hcyl(m, "Arch", H * CFrame.new(x, 11.2, -D / 2 - 0.1) * CFrame.Angles(0, math.pi / 2, 0), 0.35, 5, P.Window, Enum.Material.Neon, false)
+	end
+	HP.door(m, H * CFrame.new(0, 1.1, -D / 2), 7, 10, Color3.fromRGB(230, 120, 150), trim, false)
+	HP.eaveLights(m, H, Vector3.new(-W / 2 - 1.5, 1.1 + WH - 0.4, -D / 2 - 1.6), Vector3.new(W / 2 + 1.5, 1.1 + WH - 0.4, -D / 2 - 1.6))
+	-- Side porch with posts.
+	for _, sx in { -1, 1 } do
+		HP.window(m, H * CFrame.new(sx * (W / 2 + 0.1), 8, 0) * CFrame.Angles(0, -sx * math.pi / 2, 0), 8, 6, trim, true)
+	end
+	HP.yard(m, lot, { width = 84, depth = setback + D + 14, doorX = 4, doorZ = setback, driveX = -28, mailboxColor = domeColor, decoration = "snowman", seed = 44 })
+	return m
+end
+
+-------------------------------------------------------------------------------
+-- 5. Curlicue Townhouse: tall, narrow, with a stacked roof that curls over.
+-------------------------------------------------------------------------------
+function Houses.curlicueTownhouse(parent: Instance, lot: CFrame): Model
+	local m = B.model("CurlicueTownhouse", parent)
+	local W, D, WH = 28, 26, 30
+	local setback = 36
+	local H = lot * CFrame.new(-8, 0, setback + D / 2)
+	local body = Color3.fromRGB(235, 190, 70)
+	local trim = Color3.fromRGB(60, 80, 160)
+	foundation(m, H, W, D)
+	B.part({ Name = "Body", Size = Vector3.new(W, WH, D), CFrame = H * CFrame.new(0, 1.1 + WH / 2, 0), Color = body, Material = Enum.Material.WoodPlanks, Parent = m })
+	-- Storey bands.
+	for _, y in { 11, 21 } do
+		B.part({ Name = "Band", Size = Vector3.new(W + 0.8, 0.8, D + 0.8), CFrame = H * CFrame.new(0, 1.1 + y, 0), Color = trim, Material = Enum.Material.Wood, Parent = m })
+	end
+	-- Bay window on the front.
+	local bay = B.part({ Name = "Bay", Size = Vector3.new(12, 8, 4), CFrame = H * CFrame.new(-5, 15.5, -D / 2 - 2), Color = body, Material = Enum.Material.WoodPlanks, Parent = m })
+	B.snowCap(m, B.part({ Name = "BayRoof", Size = Vector3.new(13, 0.8, 5), CFrame = bay.CFrame * CFrame.new(0, 4.4, 0), Color = trim, Material = Enum.Material.Wood, Parent = m }), 0.5, 0)
+	HP.window(m, bay.CFrame * CFrame.new(0, 0, -2.05), 9, 5, P.Snow, true)
+	-- Other windows.
+	for _, p in { Vector2.new(7, 16), Vector2.new(-6, 26), Vector2.new(6, 26), Vector2.new(7, 6) } do
+		HP.window(m, H * CFrame.new(p.X, p.Y, -D / 2 - 0.1), 4.5, 5, P.Snow, true)
+	end
+	for _, sx in { -1, 1 } do
+		for _, y in { 6, 16, 26 } do
+			HP.window(m, H * CFrame.new(sx * (W / 2 + 0.1), y, 0) * CFrame.Angles(0, -sx * math.pi / 2, 0), 4.5, 5, P.Snow, true)
+		end
+	end
+	HP.door(m, H * CFrame.new(-6, 1.1, -D / 2), 5, 9, trim, P.Snow, false)
+	-- Curling roof: slabs stacked upward, each shifted and rotated so the
+	-- top leans over like a floppy hat.
+	local cf = H * CFrame.new(0, 1.1 + WH, 0)
+	local w, d = W + 4, D + 4
+	for i = 1, 9 do
+		local h = 2.6
+		cf = cf * CFrame.new(0, h / 2, 0)
+		local slab = B.part({ Name = "RoofTier", Size = Vector3.new(w, h, d), CFrame = cf, Color = if i % 2 == 0 then trim else trim:Lerp(Color3.new(1, 1, 1), 0.2), Material = Enum.Material.Slate, CanCollide = i <= 4, Parent = m })
+		B.part({ Name = "RoofSnow", Size = Vector3.new(w * 0.9, 0.5, d * 0.9), CFrame = slab.CFrame * CFrame.new(0, h / 2 + 0.25, 0), Color = P.Snow, Material = Enum.Material.Snow, CastShadow = false, CanCollide = false, Parent = m })
+		w *= 0.82
+		d *= 0.82
+		cf = cf * CFrame.new(0, h / 2, 0) * CFrame.Angles(0, 0, math.rad(-4 - i * 2.2)) * CFrame.new(-0.5, 0, 0)
+	end
+	local bell = B.ball(m, "Pompom", (cf * CFrame.new(0, 1.2, 0)).Position, 2.6, P.Snow, Enum.Material.Snow, false)
+	B.pointLight(bell, Color3.fromRGB(200, 220, 255), 10, 0.5)
+	HP.chimney(m, H * CFrame.new(W / 2 - 3, 1.1, D / 2 - 3), WH + 10, 3.5, Color3.fromRGB(110, 60, 55))
+	HP.eaveLights(m, H, Vector3.new(-W / 2 - 2, 1.1 + WH, -D / 2 - 2.1), Vector3.new(W / 2 + 2, 1.1 + WH, -D / 2 - 2.1))
+	HP.yard(m, lot, { width = 84, depth = setback + D + 14, doorX = -14, doorZ = setback, driveX = 26, mailboxColor = trim, decoration = "presents", seed = 55 })
+	return m
+end
+
+return Houses
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX00000016"><Properties><string name="Name">Interior</string><ProtectedString name="Source"><![CDATA[--!strict
+-- Furnished interior for Holly Cottage.
+-- Layout (house-local studs, front wall at z = -20, back wall at z = +20):
+--   Living room  x -28..-6, z -20..6   (fireplace, sofa, Christmas tree)
+--   Den          x -28..-6, z  6..20   (bookshelf, armchairs, toy chest)
+--   Hallway      x  -6.. 2, z -20..20  (front door at x = -3)
+--   Kitchen      x   2..28, z -20..4   (counters, stove, fridge, table)
+--   Bedroom      x   2..28, z  4..20   (bed, nightstands, dresser)
+-- Ceiling height is 14 studs, doorways 6 x 9, sized for R15/R6 characters.
+local B = require(script.Parent.Builder)
+local Props = require(script.Parent.Props)
+local HP = require(script.Parent.HouseParts)
+local P = B.Palette
+
+local Interior = {}
+
+export type Opts = { width: number, depth: number, wallHeight: number, floorY: number, trim: Color3 }
+
+function Interior.build(house: Model, H: CFrame, o: Opts)
+	local m = B.model("Interior", house)
+	local spots = B.folder("PresentSpots", house)
+	local fy = o.floorY + 0.2 -- top of the floorboards
+	local WH = o.wallHeight
+	local function at(x: number, y: number, z: number, yaw: number?): CFrame
+		return H * CFrame.new(x, fy + y, z) * CFrame.Angles(0, yaw or 0, 0)
+	end
+	local function box(name: string, size: Vector3, cf: CFrame, color: Color3, mat: Enum.Material?, collide: boolean?)
+		return B.part({ Name = name, Size = size, CFrame = cf, Color = color, Material = mat, CanCollide = collide, Parent = m })
+	end
+
+	local wallpaper = Color3.fromRGB(236, 222, 196)
+	local denPaper = Color3.fromRGB(170, 200, 180)
+	local bedPaper = Color3.fromRGB(200, 190, 225)
+	local wood = Color3.fromRGB(150, 100, 62)
+	local fabricRed = Color3.fromRGB(160, 40, 50)
+
+	-- Floors.
+	box("Floor", Vector3.new(o.width - 1, 0.2, o.depth - 1), H * CFrame.new(0, o.floorY + 0.1, 0), Color3.fromRGB(160, 110, 70), Enum.Material.WoodPlanks)
+	box("KitchenTile", Vector3.new(25, 0.05, 23), at(15, 0.02, -8), Color3.fromRGB(235, 235, 240), Enum.Material.Marble, false)
+
+	-- Interior walls (offsets measured from each wall's start point).
+	local function wallAt(x: number, z: number, alongZ: boolean): CFrame
+		local cf = H * CFrame.new(x, o.floorY, z)
+		return if alongZ then cf * CFrame.Angles(0, -math.pi / 2, 0) else cf
+	end
+	B.wall(m, "HallWallWest", wallAt(-6, -20, true), 40, WH, 0.8, wallpaper, Enum.Material.SmoothPlastic, {
+		{ x = 5, w = 12, y = 0, h = 10 }, -- wide opening into the living room
+		{ x = 29, w = 6, y = 0, h = 9 }, -- den door
+	})
+	B.wall(m, "HallWallEast", wallAt(2, -20, true), 40, WH, 0.8, wallpaper, Enum.Material.SmoothPlastic, {
+		{ x = 6, w = 9, y = 0, h = 10 }, -- kitchen opening
+		{ x = 29, w = 6, y = 0, h = 9 }, -- bedroom door
+	})
+	B.wall(m, "LivingDenWall", wallAt(-28, 6, false), 22, WH, 0.8, denPaper, Enum.Material.SmoothPlastic)
+	B.wall(m, "KitchenBedWall", wallAt(2, 4, false), 26, WH, 0.8, bedPaper, Enum.Material.SmoothPlastic)
+	-- Baseboards along every room (cheap detail that sells the interior).
+	local base = Color3.fromRGB(250, 246, 238)
+	for _, seg in {
+		{ Vector3.new(21, 0.8, 0.3), Vector3.new(-17, 0.4, -19.3) },
+		{ Vector3.new(21, 0.8, 0.3), Vector3.new(-17, 0.4, 19.3) },
+		{ Vector3.new(25, 0.8, 0.3), Vector3.new(15, 0.4, 19.3) },
+		{ Vector3.new(25, 0.8, 0.3), Vector3.new(15, 0.4, -19.3) },
+		{ Vector3.new(0.3, 0.8, 39), Vector3.new(-27.3, 0.4, 0) },
+		{ Vector3.new(0.3, 0.8, 39), Vector3.new(27.3, 0.4, 0) },
+	} do
+		box("Baseboard", seg[1], at(seg[2].X, seg[2].Y, seg[2].Z), base, Enum.Material.Wood, false)
+	end
+
+	-- Ceiling lights, one per room.
+	local function ceilingLight(x: number, z: number, range: number)
+		local fixture = box("CeilingLight", Vector3.new(2.4, 0.5, 2.4), at(x, WH - 0.5, z), Color3.fromRGB(255, 230, 180), Enum.Material.Neon, false)
+		fixture.CastShadow = false
+		B.pointLight(fixture, P.WarmLight, range, 0.9, true)
+	end
+	ceilingLight(-17, -8, 22)
+	ceilingLight(-17, 13, 16)
+	ceilingLight(-2, 0, 16)
+	ceilingLight(15, -8, 20)
+	ceilingLight(15, 12, 16)
+
+	---------------------------------------------------------------- Living room
+	local rug = box("Rug", Vector3.new(12, 0.1, 14), at(-17, 0.05, -8), fabricRed, Enum.Material.Fabric, false)
+	box("RugBorder", Vector3.new(13, 0.08, 15), rug.CFrame * CFrame.new(0, -0.02, 0), P.Gold, Enum.Material.Fabric, false)
+
+	-- Fireplace against the left (west) wall.
+	local stone = Color3.fromRGB(150, 140, 135)
+	box("Hearth", Vector3.new(4, 0.6, 11), at(-25.5, 0.3, -8), stone, Enum.Material.Cobblestone)
+	box("FireplaceLeft", Vector3.new(3, 7, 1.6), at(-26.5, 3.5, -12), stone, Enum.Material.Cobblestone)
+	box("FireplaceRight", Vector3.new(3, 7, 1.6), at(-26.5, 3.5, -4), stone, Enum.Material.Cobblestone)
+	box("FireplaceTop", Vector3.new(3, 2.4, 9.6), at(-26.5, 6.2, -8), stone, Enum.Material.Cobblestone)
+	box("Firebox", Vector3.new(0.4, 5, 6.4), at(-27.6, 2.5, -8), Color3.fromRGB(25, 20, 20))
+	box("Mantel", Vector3.new(3.6, 0.6, 11), at(-26.2, 7.6, -8), wood, Enum.Material.Wood)
+	box("Chimneybreast", Vector3.new(2, WH - 7.9, 7), at(-27, 7.9 + (WH - 7.9) / 2, -8), stone, Enum.Material.Cobblestone)
+	for i = 0, 2 do
+		B.hcyl(m, "Log", at(-26.3, 0.9 + (i % 2) * 0.6, -9 + i), 3, 0.7, P.DarkWood, Enum.Material.Wood, false)
+	end
+	local fire = box("Fire", Vector3.new(1.4, 2, 3.4), at(-26.3, 1.8, -8), Color3.fromRGB(255, 140, 40), Enum.Material.Neon, false)
+	fire.Transparency = 0.2
+	fire.CastShadow = false
+	B.pointLight(fire, Color3.fromRGB(255, 140, 60), 20, 1.6, true)
+	B.tag(fire, "Fireplace")
+	local fireFx = Instance.new("Fire")
+	fireFx.Size = 3
+	fireFx.Heat = 4
+	fireFx.Color = Color3.fromRGB(255, 120, 40)
+	fireFx.SecondaryColor = Color3.fromRGB(255, 220, 90)
+	fireFx.Parent = fire
+	-- Stockings on the mantel (future steal targets).
+	local stockingColors = { P.Red, P.Green, fabricRed }
+	for i, c in stockingColors do
+		local z = -11 + (i - 1) * 3
+		box("Stocking", Vector3.new(0.4, 2, 1), at(-24.6, 6.2, z), c, Enum.Material.Fabric, false)
+		box("StockingFoot", Vector3.new(0.4, 0.8, 1.6), at(-24.6, 5.4, z + 0.4), c, Enum.Material.Fabric, false)
+		box("StockingCuff", Vector3.new(0.45, 0.5, 1.1), at(-24.6, 7.1, z), P.Snow, Enum.Material.Fabric, false)
+		HP.presentSpot(spots, at(-24.6, 5, z), "Living")
+	end
+	B.stringLights(m, (at(-25.7, 8, -13)).Position, (at(-25.7, 8, -3)).Position, 1.2, 0.4, 0)
+
+	-- Sofa facing the fireplace.
+	local sofaCf = at(-13, 0, -8, math.pi / 2) -- LookVector toward the fireplace (-X)
+	box("SofaBase", Vector3.new(10, 1.6, 4), sofaCf * CFrame.new(0, 1.3, 0), Color3.fromRGB(70, 90, 140), Enum.Material.Fabric)
+	box("SofaBack", Vector3.new(10, 3, 1.2), sofaCf * CFrame.new(0, 3, 1.6), Color3.fromRGB(70, 90, 140), Enum.Material.Fabric)
+	for _, sx in { -1, 1 } do
+		box("SofaArm", Vector3.new(1.2, 2.6, 4), sofaCf * CFrame.new(sx * 5.2, 1.8, 0), Color3.fromRGB(60, 80, 125), Enum.Material.Fabric)
+		box("Cushion", Vector3.new(1.6, 1.6, 0.6), sofaCf * CFrame.new(sx * 3.4, 3, 0.8) * CFrame.Angles(0.2, 0, 0), fabricRed, Enum.Material.Fabric, false)
+	end
+	for i = -1, 1 do
+		box("SeatCushion", Vector3.new(3.1, 0.5, 3.4), sofaCf * CFrame.new(i * 3.2, 2.35, -0.2), Color3.fromRGB(80, 100, 155), Enum.Material.Fabric)
+	end
+	B.part({ Name = "Throw", Size = Vector3.new(2.5, 0.1, 3), CFrame = sofaCf * CFrame.new(-3.2, 2.65, -0.3), Color = P.Green, Material = Enum.Material.Fabric, CanCollide = false, Parent = m })
+
+	-- Coffee table with cocoa mugs.
+	box("CoffeeTop", Vector3.new(3.5, 0.4, 6), at(-19, 1.8, -8), wood, Enum.Material.Wood)
+	for _, sx in { -1, 1 } do
+		for _, sz in { -1, 1 } do
+			box("CoffeeLeg", Vector3.new(0.4, 1.6, 0.4), at(-19 + sx * 1.4, 0.8, -8 + sz * 2.6), P.DarkWood, Enum.Material.Wood)
+		end
+	end
+	for _, z in { -9, -7 } do
+		B.vcyl(m, "Mug", at(-19, 2.35, z), 0.7, 0.6, P.Snow, nil, false)
+	end
+	HP.presentSpot(spots, at(-19, 2, -8), "Living")
+
+	-- Armchair in the corner.
+	local chairCf = at(-9, 0, 3.5, math.rad(200))
+	box("ChairSeat", Vector3.new(4, 1.8, 4), chairCf * CFrame.new(0, 1.2, 0), Color3.fromRGB(120, 60, 50), Enum.Material.Fabric)
+	box("ChairBack", Vector3.new(4, 3, 1), chairCf * CFrame.new(0, 3.3, 1.5), Color3.fromRGB(120, 60, 50), Enum.Material.Fabric)
+
+	-- The Christmas tree in the back-left corner of the living room.
+	local treeBase = at(-22, 0, 1)
+	box("TreeStand", Vector3.new(2.4, 1, 2.4), treeBase * CFrame.new(0, 0.5, 0), fabricRed, Enum.Material.Fabric)
+	box("TreeSkirt", Vector3.new(7, 0.1, 7), treeBase * CFrame.new(0, 0.05, 0), P.Snow, Enum.Material.Fabric, false)
+	local tiers = { { 7.5, 3.6, 1 }, { 6.2, 3.2, 3.6 }, { 4.8, 2.9, 6 }, { 3.2, 2.5, 8.2 }, { 1.8, 2, 10 } }
+	local rng = Random.new(5)
+	local ornamentColors = { P.Red, P.Gold, Color3.fromRGB(80, 150, 255), Color3.fromRGB(230, 230, 240), Color3.fromRGB(200, 70, 200) }
+	for ti, t in tiers do
+		local d, h, y = t[1], t[2], t[3]
+		B.blob(m, "TreeTier", treeBase * CFrame.new(0, y + h / 2, 0) * CFrame.Angles(0, ti, 0), Vector3.new(d, h, d), if ti % 2 == 0 then P.Pine else P.PineDark, Enum.Material.Grass, ti == 1)
+		for k = 1, 5 do
+			local a = (k / 5 + ti * 0.13) * math.pi * 2
+			local r = d * 0.46
+			local pos = (treeBase * CFrame.new(math.cos(a) * r, y + h * rng:NextNumber(0.25, 0.5), math.sin(a) * r)).Position
+			local isBulb = k % 2 == 0
+			local orb = B.ball(m, if isBulb then "TreeBulb" else "Ornament", pos, if isBulb then 0.4 else 0.65, ornamentColors[((k + ti) % #ornamentColors) + 1], if isBulb then Enum.Material.Neon else Enum.Material.Glass, false)
+			orb.CastShadow = false
+			if isBulb then
+				orb:SetAttribute("Index", k + ti)
+				B.tag(orb, "XmasBulb")
+			end
+		end
+	end
+	local star = B.part({ Name = "TreeStar", Size = Vector3.new(1.2, 1.2, 0.3), CFrame = treeBase * CFrame.new(0, 12.6, 0) * CFrame.Angles(0, 0, math.rad(45)), Color = P.Gold, Material = Enum.Material.Neon, CanCollide = false, Parent = m })
+	B.part({ Name = "TreeStar", Size = Vector3.new(1.2, 1.2, 0.3), CFrame = star.CFrame * CFrame.Angles(0, 0, math.rad(45)), Color = P.Gold, Material = Enum.Material.Neon, CanCollide = false, Parent = m })
+	B.pointLight(star, P.Gold, 10, 0.8)
+	-- Presents under the tree (decorative now; spawn points for later).
+	local giftColors = { P.Red, P.Green, Color3.fromRGB(70, 110, 210), Color3.fromRGB(240, 240, 245), Color3.fromRGB(200, 70, 200) }
+	for i = 1, 5 do
+		local a = i / 5 * math.pi * 2
+		local cf = treeBase * CFrame.new(math.cos(a) * 3, 0.1, math.sin(a) * 3) * CFrame.Angles(0, a, 0)
+		Props.present(m, cf, Vector3.new(1.6, 1.3, 1.6) * rng:NextNumber(0.8, 1.4), giftColors[i])
+		HP.presentSpot(spots, cf, "Living")
+	end
+	-- Garland across the living-room front window.
+	B.stringLights(m, (at(-24, 10.8, -19.2)).Position, (at(-10, 10.8, -19.2)).Position, 1.4, 0.7, 0)
+
+	---------------------------------------------------------------- Hallway
+	box("Runner", Vector3.new(4, 0.08, 34), at(-2, 0.04, 0), Color3.fromRGB(120, 40, 50), Enum.Material.Fabric, false)
+	box("HallTable", Vector3.new(1.6, 0.3, 4), at(1, 3, 2), wood, Enum.Material.Wood)
+	box("HallTableLegs", Vector3.new(1.2, 2.9, 3.6), at(1, 1.45, 2), P.DarkWood, Enum.Material.Wood)
+	local lamp = box("HallLamp", Vector3.new(1, 1.2, 1), at(1, 4.2, 2), Color3.fromRGB(255, 220, 160), Enum.Material.Neon, false)
+	B.pointLight(lamp, P.WarmLight, 10, 0.6)
+	box("CoatRack", Vector3.new(0.4, 6, 0.4), at(1, 3, -18), P.DarkWood, Enum.Material.Wood)
+	B.ball(m, "Hat", (at(1, 6.3, -18)).Position, 1.2, P.Red, Enum.Material.Fabric, false)
+	for i, z in { -15, -1, 6 } do
+		local frame = box("Picture", Vector3.new(0.2, 3, 2.4), at(1.5, 7, z), P.Gold, Enum.Material.Metal, false)
+		box("Canvas", Vector3.new(0.1, 2.4, 1.8), frame.CFrame * CFrame.new(-0.12, 0, 0), ({ Color3.fromRGB(90, 140, 200), Color3.fromRGB(200, 120, 90), Color3.fromRGB(110, 170, 110) })[i], Enum.Material.SmoothPlastic, false)
+	end
+	HP.presentSpot(spots, at(-2, 0, 17), "Hallway")
+
+	---------------------------------------------------------------- Kitchen
+	local counter = Color3.fromRGB(245, 245, 248)
+	local cabinet = Color3.fromRGB(90, 140, 120)
+	-- Counters along the front wall (under the window) and the east wall.
+	box("CounterFront", Vector3.new(16, 3.4, 2.6), at(18, 1.7, -18.4), cabinet, Enum.Material.Wood)
+	box("CounterFrontTop", Vector3.new(16.4, 0.3, 3), at(18, 3.55, -18.3), counter, Enum.Material.Marble)
+	box("CounterEast", Vector3.new(2.6, 3.4, 12), at(26.4, 1.7, -10), cabinet, Enum.Material.Wood)
+	box("CounterEastTop", Vector3.new(3, 0.3, 12.4), at(26.3, 3.55, -10), counter, Enum.Material.Marble)
+	box("Sink", Vector3.new(4, 0.2, 2), at(15, 3.65, -18.3), Color3.fromRGB(170, 175, 185), Enum.Material.Metal, false)
+	box("Faucet", Vector3.new(0.3, 1.2, 0.3), at(15, 4.3, -19.2), Color3.fromRGB(200, 200, 210), Enum.Material.Metal, false)
+	-- Stove with oven window glow.
+	box("Stove", Vector3.new(5, 3.6, 2.8), at(7, 1.8, -18.4), Color3.fromRGB(40, 40, 46), Enum.Material.Metal)
+	local oven = box("OvenWindow", Vector3.new(3, 1.4, 0.1), at(7, 1.6, -16.95), Color3.fromRGB(255, 150, 60), Enum.Material.Neon, false)
+	oven.Transparency = 0.3
+	for _, sx in { -1, 1 } do
+		for _, sz in { -1, 1 } do
+			B.vcyl(m, "Burner", at(7 + sx * 1.2, 3.65, -18.4 + sz * 0.6), 0.1, 0.9, Color3.fromRGB(20, 20, 20), nil, false)
+		end
+	end
+	B.vcyl(m, "Pot", at(5.8, 4.3, -18.4), 1.2, 1.4, Color3.fromRGB(180, 60, 50), Enum.Material.Metal, false)
+	-- Fridge in the corner by the bedroom wall.
+	box("Fridge", Vector3.new(4, 9, 3.4), at(25.6, 4.5, 1.6), Color3.fromRGB(235, 238, 242), Enum.Material.SmoothPlastic)
+	box("FridgeHandle", Vector3.new(0.2, 3, 0.3), at(23.5, 5.5, 0.6), Color3.fromRGB(180, 180, 190), Enum.Material.Metal, false)
+	-- Upper cabinets.
+	box("UpperCabinets", Vector3.new(5, 3, 1.8), at(24.5, 9.5, -19), cabinet, Enum.Material.Wood)
+	-- Kitchen table with chairs and a plate of cookies.
+	box("TableTop", Vector3.new(8, 0.4, 5), at(14, 3, -7), wood, Enum.Material.Wood)
+	for _, sx in { -1, 1 } do
+		for _, sz in { -1, 1 } do
+			box("TableLeg", Vector3.new(0.4, 2.8, 0.4), at(14 + sx * 3.5, 1.4, -7 + sz * 2), P.DarkWood, Enum.Material.Wood)
+		end
+	end
+	for _, c in { { 14 - 2, -10.2, 0 }, { 14 + 2, -10.2, 0 }, { 14 - 2, -3.8, math.pi }, { 14 + 2, -3.8, math.pi } } do
+		local cf = at(c[1], 0, c[2], c[3])
+		box("ChairSeat", Vector3.new(2.2, 0.3, 2.2), cf * CFrame.new(0, 2, 0), wood, Enum.Material.Wood)
+		box("ChairBack", Vector3.new(2.2, 2.6, 0.3), cf * CFrame.new(0, 3.3, -1), wood, Enum.Material.Wood)
+		box("ChairLegs", Vector3.new(1.8, 1.9, 1.8), cf * CFrame.new(0, 0.95, 0), P.DarkWood, Enum.Material.Wood, false)
+	end
+	B.vcyl(m, "Plate", at(14, 3.25, -7), 0.1, 2, P.Snow, nil, false)
+	for i = 0, 4 do
+		local a = i / 5 * math.pi * 2
+		B.vcyl(m, "Cookie", at(14 + math.cos(a) * 0.5, 3.35, -7 + math.sin(a) * 0.5), 0.12, 0.6, Color3.fromRGB(200, 140, 80), nil, false)
+	end
+	HP.presentSpot(spots, at(10, 3.2, -7), "Kitchen")
+	HP.presentSpot(spots, at(20, 0, -2), "Kitchen")
+
+	---------------------------------------------------------------- Bedroom
+	local bedCf = at(17, 0, 14) -- head against the back wall
+	box("BedFrame", Vector3.new(8, 1.6, 11), bedCf * CFrame.new(0, 0.8, 0), wood, Enum.Material.Wood)
+	box("Mattress", Vector3.new(7.6, 1.2, 10.4), bedCf * CFrame.new(0, 2.2, 0), Color3.fromRGB(245, 245, 250), Enum.Material.Fabric)
+	box("Blanket", Vector3.new(7.8, 0.4, 7), bedCf * CFrame.new(0, 2.9, -1.6), Color3.fromRGB(80, 70, 150), Enum.Material.Fabric)
+	box("Headboard", Vector3.new(8, 5, 0.6), bedCf * CFrame.new(0, 2.5, 5.3), P.DarkWood, Enum.Material.Wood)
+	for _, sx in { -1.8, 1.8 } do
+		box("Pillow", Vector3.new(3, 0.8, 1.8), bedCf * CFrame.new(sx, 3.1, 3.8), P.Snow, Enum.Material.Fabric, false)
+	end
+	for _, sx in { -6.5, 6.5 } do
+		box("Nightstand", Vector3.new(3, 2.8, 2.6), at(17 + sx, 1.4, 18.4), wood, Enum.Material.Wood)
+		local l = box("BedsideLamp", Vector3.new(1, 1.4, 1), at(17 + sx, 3.5, 18.4), Color3.fromRGB(255, 220, 170), Enum.Material.Neon, false)
+		B.pointLight(l, P.WarmLight, 9, 0.5)
+	end
+	box("Dresser", Vector3.new(2.6, 4.4, 7), at(26.4, 2.2, 9), wood, Enum.Material.Wood)
+	for i = 0, 2 do
+		box("Drawer", Vector3.new(0.1, 1, 6), at(25.05, 0.9 + i * 1.4, 9), P.DarkWood, Enum.Material.Wood, false)
+	end
+	box("BedRug", Vector3.new(10, 0.08, 6), at(17, 0.04, 7.5), Color3.fromRGB(230, 200, 120), Enum.Material.Fabric, false)
+	HP.presentSpot(spots, at(17, 0, 8), "Bedroom")
+	HP.presentSpot(spots, at(26.4, 4.4, 9), "Bedroom")
+
+	---------------------------------------------------------------- Den
+	box("Bookshelf", Vector3.new(10, 9, 2), at(-17, 4.5, 7.4), P.DarkWood, Enum.Material.Wood)
+	local bookColors = { P.Red, P.Green, Color3.fromRGB(70, 110, 210), P.Gold, Color3.fromRGB(150, 90, 160) }
+	for shelf = 0, 2 do
+		box("Shelf", Vector3.new(9.6, 0.25, 1.8), at(-17, 1.4 + shelf * 2.8, 7.6), wood, Enum.Material.Wood, false)
+		local x = -21.2
+		local k = 0
+		while x < -13 do
+			local w = 0.4 + (k % 3) * 0.15
+			box("Book", Vector3.new(w, 2, 1.4), at(x + w / 2, 2.5 + shelf * 2.8, 7.8), bookColors[(k + shelf) % #bookColors + 1], Enum.Material.SmoothPlastic, false)
+			x += w + 0.05
+			k += 1
+		end
+	end
+	for _, c in { { -21, 15.5, math.rad(-30) }, { -13, 15.5, math.rad(30) } } do
+		local cf = at(c[1], 0, c[2], c[3])
+		box("ArmchairSeat", Vector3.new(3.6, 1.8, 3.6), cf * CFrame.new(0, 1.2, 0), Color3.fromRGB(60, 110, 90), Enum.Material.Fabric)
+		box("ArmchairBack", Vector3.new(3.6, 3, 1), cf * CFrame.new(0, 3.3, 1.4), Color3.fromRGB(60, 110, 90), Enum.Material.Fabric)
+	end
+	B.vcyl(m, "SideTable", at(-17, 1.3, 15.5), 2.6, 3, wood, Enum.Material.Wood)
+	HP.presentSpot(spots, at(-17, 2.6, 15.5), "Den")
+	box("ToyChest", Vector3.new(4, 2.4, 2.6), at(-25.5, 1.2, 18), fabricRed, Enum.Material.Wood)
+	box("ToyChestLid", Vector3.new(4.2, 0.4, 2.8), at(-25.5, 2.6, 18), P.Gold, Enum.Material.Wood)
+	B.ball(m, "ToyBall", (at(-23, 0.8, 9)).Position, 1.6, Color3.fromRGB(80, 150, 255), nil, true)
+	HP.presentSpot(spots, at(-25.5, 2.8, 18), "Den")
+
+	return m
+end
+
+return Interior
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX00000017"><Properties><string name="Name">Props</string><ProtectedString name="Source"><![CDATA[--!strict
+-- Reusable decorative props. Each function returns a Model placed at `cf`
+-- (cf = position on the ground, facing its LookVector).
+local B = require(script.Parent.Builder)
+local P = B.Palette
+
+local Props = {}
+
+-- Stylized snowy pine: stacked rounded tiers with snow on each tier.
+function Props.pine(parent: Instance, cf: CFrame, height: number, rng: Random?): Model
+	local r = rng or Random.new()
+	local m = B.model("Pine", parent)
+	local trunkH = height * 0.18
+	B.vcyl(m, "Trunk", cf * CFrame.new(0, trunkH / 2, 0), trunkH, height * 0.09, P.DarkWood, Enum.Material.Wood)
+	local tiers = 4
+	local y = trunkH * 0.7
+	local tierH = (height - trunkH) / tiers * 1.25
+	for i = 1, tiers do
+		local w = height * 0.55 * (1 - (i - 1) / (tiers + 0.6))
+		local lean = CFrame.Angles(r:NextNumber(-0.05, 0.05), r:NextNumber(0, math.pi * 2), r:NextNumber(-0.05, 0.05))
+		local tierCf = cf * CFrame.new(0, y + tierH / 2, 0) * lean
+		B.blob(m, "Tier", tierCf, Vector3.new(w, tierH, w), if i % 2 == 0 then P.Pine else P.PineDark, Enum.Material.Grass, i == 1)
+		B.blob(m, "TierSnow", tierCf * CFrame.new(0, tierH * 0.28, 0), Vector3.new(w * 0.8, tierH * 0.45, w * 0.8), P.Snow, Enum.Material.Snow, false)
+		y += tierH * 0.62
+	end
+	B.blob(m, "TopSnow", cf * CFrame.new(0, y + tierH * 0.25, 0), Vector3.new(height * 0.12, tierH * 0.5, height * 0.12), P.Snow, Enum.Material.Snow, false)
+	return m
+end
+
+function Props.lamppost(parent: Instance, cf: CFrame, withWreath: boolean?): Model
+	local m = B.model("Lamppost", parent)
+	B.vcyl(m, "Base", cf * CFrame.new(0, 0.6, 0), 1.2, 1.8, P.Iron, Enum.Material.Metal)
+	B.vcyl(m, "Pole", cf * CFrame.new(0, 7, 0), 12, 0.6, P.Iron, Enum.Material.Metal)
+	-- Curled arm
+	B.part({ Name = "Arm", Size = Vector3.new(0.4, 0.4, 2.6), CFrame = cf * CFrame.new(0, 12.8, -1.1), Color = P.Iron, Material = Enum.Material.Metal, Parent = m })
+	B.ball(m, "Curl", (cf * CFrame.new(0, 13.2, 0.3)).Position, 0.8, P.Iron, Enum.Material.Metal)
+	local lantern = B.part({ Name = "Lantern", Size = Vector3.new(1.4, 1.8, 1.4), CFrame = cf * CFrame.new(0, 11.6, -2.3), Color = P.Window, Material = Enum.Material.Neon, CanCollide = false, Parent = m })
+	B.part({ Name = "LanternCap", Size = Vector3.new(1.9, 0.4, 1.9), CFrame = lantern.CFrame * CFrame.new(0, 1.1, 0), Color = P.Iron, Material = Enum.Material.Metal, Parent = m })
+	B.part({ Name = "CapSnow", Size = Vector3.new(1.7, 0.35, 1.7), CFrame = lantern.CFrame * CFrame.new(0, 1.45, 0), Color = P.Snow, Material = Enum.Material.Snow, CastShadow = false, Parent = m })
+	B.pointLight(lantern, P.WarmLight, 26, 1.4, false)
+	if withWreath then
+		local w = B.hcyl(m, "Wreath", cf * CFrame.new(0, 8.5, -0.45) * CFrame.Angles(0, math.pi / 2, 0), 0.4, 2.2, P.Green, Enum.Material.Grass, false)
+		B.ball(m, "Bow", (w.CFrame * CFrame.new(-0.25, 0.9, 0)).Position, 0.6, P.Red, Enum.Material.SmoothPlastic, false)
+	end
+	return m
+end
+
+function Props.bench(parent: Instance, cf: CFrame): Model
+	local m = B.model("Bench", parent)
+	for _, x in { -2.4, 2.4 } do
+		B.part({ Name = "Leg", Size = Vector3.new(0.4, 2, 2), CFrame = cf * CFrame.new(x, 1, 0), Color = P.Iron, Material = Enum.Material.Metal, Parent = m })
+	end
+	for i = 0, 2 do
+		B.part({ Name = "Slat", Size = Vector3.new(6, 0.25, 0.55), CFrame = cf * CFrame.new(0, 2.1, -0.65 + i * 0.65), Color = P.Wood, Material = Enum.Material.Wood, Parent = m })
+	end
+	local back = B.part({ Name = "Back", Size = Vector3.new(6, 1.6, 0.25), CFrame = cf * CFrame.new(0, 3.2, 1) * CFrame.Angles(-0.15, 0, 0), Color = P.Wood, Material = Enum.Material.Wood, Parent = m })
+	B.part({ Name = "Snow", Size = Vector3.new(5.6, 0.35, 1.6), CFrame = cf * CFrame.new(0, 2.4, -0.1), Color = P.Snow, Material = Enum.Material.Snow, CastShadow = false, CanCollide = false, Parent = m })
+	B.snowCap(m, back, 0.25, 0)
+	return m
+end
+
+-- Picket fence running along local X for `length` studs.
+function Props.fence(parent: Instance, cf: CFrame, length: number, color: Color3?): Model
+	local m = B.model("Fence", parent)
+	local c = color or Color3.fromRGB(240, 236, 228)
+	local count = math.floor(length / 1.6)
+	for i = 0, count do
+		local x = -length / 2 + i * (length / count)
+		local picket = B.part({ Name = "Picket", Size = Vector3.new(0.6, 3.2, 0.25), CFrame = cf * CFrame.new(x, 1.6, 0), Color = c, Material = Enum.Material.Wood, Parent = m })
+		B.part({ Name = "PicketSnow", Size = Vector3.new(0.7, 0.25, 0.4), CFrame = picket.CFrame * CFrame.new(0, 1.7, 0), Color = P.Snow, Material = Enum.Material.Snow, CastShadow = false, CanCollide = false, Parent = m })
+	end
+	for _, y in { 1, 2.4 } do
+		B.part({ Name = "Rail", Size = Vector3.new(length, 0.3, 0.2), CFrame = cf * CFrame.new(0, y, 0.2), Color = c, Material = Enum.Material.Wood, Parent = m })
+	end
+	return m
+end
+
+function Props.mailbox(parent: Instance, cf: CFrame, color: Color3): Model
+	local m = B.model("Mailbox", parent)
+	B.part({ Name = "Post", Size = Vector3.new(0.5, 3.6, 0.5), CFrame = cf * CFrame.new(0, 1.8, 0), Color = P.Wood, Material = Enum.Material.Wood, Parent = m })
+	local box = B.hcyl(m, "Box", cf * CFrame.new(0, 4, 0) * CFrame.Angles(0, math.pi / 2, 0), 2.2, 1.3, color, Enum.Material.Metal)
+	B.part({ Name = "Flag", Size = Vector3.new(0.1, 0.8, 0.3), CFrame = cf * CFrame.new(0.7, 4.5, 0.3), Color = P.Red, Parent = m })
+	B.blob(m, "Snow", box.CFrame * CFrame.new(0, 0.55, 0), Vector3.new(2, 0.5, 1.1), P.Snow, Enum.Material.Snow, false)
+	return m
+end
+
+function Props.snowman(parent: Instance, cf: CFrame, scale: number?): Model
+	local s = scale or 1
+	local m = B.model("Snowman", parent)
+	B.ball(m, "Bottom", (cf * CFrame.new(0, 2 * s, 0)).Position, 4.2 * s, P.Snow, Enum.Material.Snow)
+	B.ball(m, "Middle", (cf * CFrame.new(0, 5.2 * s, 0)).Position, 3.1 * s, P.Snow, Enum.Material.Snow)
+	local head = B.ball(m, "Head", (cf * CFrame.new(0, 7.6 * s, 0)).Position, 2.2 * s, P.Snow, Enum.Material.Snow)
+	local face = CFrame.lookAt(head.Position, head.Position + cf.LookVector)
+	B.part({ Name = "Nose", Size = Vector3.new(0.3, 0.3, 1.2) * s, CFrame = face * CFrame.new(0, 0, -1.3 * s), Color = Color3.fromRGB(240, 130, 40), CanCollide = false, Parent = m })
+	for _, x in { -0.4, 0.4 } do
+		B.ball(m, "Eye", (face * CFrame.new(x * s, 0.35 * s, -1 * s)).Position, 0.28 * s, P.Iron, nil, false)
+	end
+	B.vcyl(m, "HatBrim", face * CFrame.new(0, 1 * s, 0), 0.2 * s, 2.4 * s, P.Iron)
+	B.vcyl(m, "Hat", face * CFrame.new(0, 1.8 * s, 0), 1.5 * s, 1.6 * s, P.Iron)
+	B.vcyl(m, "Scarf", cf * CFrame.new(0, 6.6 * s, 0), 0.5 * s, 2.5 * s, P.Red, Enum.Material.Fabric, false)
+	return m
+end
+
+function Props.present(parent: Instance, cf: CFrame, size: Vector3, color: Color3, ribbon: Color3?): Model
+	local m = B.model("Present", parent)
+	local box = B.part({ Name = "Box", Size = size, CFrame = cf * CFrame.new(0, size.Y / 2, 0), Color = color, Parent = m })
+	local rc = ribbon or P.Gold
+	B.part({ Name = "RibbonX", Size = Vector3.new(size.X + 0.05, size.Y + 0.05, size.Z * 0.18), CFrame = box.CFrame, Color = rc, CanCollide = false, Parent = m })
+	B.part({ Name = "RibbonZ", Size = Vector3.new(size.X * 0.18, size.Y + 0.05, size.Z + 0.05), CFrame = box.CFrame, Color = rc, CanCollide = false, Parent = m })
+	B.ball(m, "Bow", (box.CFrame * CFrame.new(0, size.Y / 2 + 0.15, 0)).Position, math.min(size.X, size.Z) * 0.35, rc, nil, false)
+	m.PrimaryPart = box
+	return m
+end
+
+function Props.wreath(parent: Instance, cf: CFrame, diameter: number?): Model
+	local d = diameter or 3
+	local m = B.model("Wreath", parent)
+	local ring = B.hcyl(m, "Ring", cf * CFrame.Angles(0, math.pi / 2, 0), 0.5, d, P.Green, Enum.Material.Grass, false)
+	B.hcyl(m, "Hole", ring.CFrame * CFrame.new(0.05, 0, 0), 0.52, d * 0.45, P.DarkWood, Enum.Material.Wood, false)
+	for i = 0, 5 do
+		local a = i / 6 * math.pi * 2
+		B.ball(m, "Berry", (cf * CFrame.new(math.cos(a) * d * 0.36, math.sin(a) * d * 0.36, -0.3)).Position, 0.35, P.Red, nil, false)
+	end
+	B.ball(m, "Bow", (cf * CFrame.new(0, -d * 0.4, -0.35)).Position, 0.7, P.Red, nil, false)
+	return m
+end
+
+-- Soft snowbank along local X.
+function Props.snowbank(parent: Instance, cf: CFrame, length: number, height: number?): Model
+	local m = B.model("Snowbank", parent)
+	local h = height or 2.5
+	local pieces = math.max(1, math.floor(length / 10))
+	for i = 1, pieces do
+		local x = -length / 2 + (i - 0.5) * (length / pieces)
+		B.blob(m, "Bank", cf * CFrame.new(x, h * 0.25, 0), Vector3.new(length / pieces * 1.35, h, 4), P.Snow, Enum.Material.Snow, false)
+	end
+	return m
+end
+
+function Props.bush(parent: Instance, cf: CFrame, size: number): Model
+	local m = B.model("Bush", parent)
+	B.blob(m, "Leaves", cf * CFrame.new(0, size * 0.35, 0), Vector3.new(size, size * 0.8, size), P.PineDark, Enum.Material.Grass, true)
+	B.blob(m, "Snow", cf * CFrame.new(0, size * 0.6, 0), Vector3.new(size * 0.8, size * 0.4, size * 0.8), P.Snow, Enum.Material.Snow, false)
+	return m
+end
+
+function Props.streetSign(parent: Instance, cf: CFrame, text: string): Model
+	local m = B.model("StreetSign", parent)
+	B.vcyl(m, "Pole", cf * CFrame.new(0, 5, 0), 10, 0.4, P.Iron, Enum.Material.Metal)
+	local board = B.part({ Name = "Board", Size = Vector3.new(6, 1.3, 0.2), CFrame = cf * CFrame.new(0, 9.6, 0), Color = Color3.fromRGB(30, 90, 60), Material = Enum.Material.Metal, Parent = m })
+	B.snowCap(m, board, 0.25, 0)
+	for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
+		local gui = Instance.new("SurfaceGui")
+		gui.Face = face
+		gui.PixelsPerStud = 40
+		gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+		gui.Parent = board
+		local label = Instance.new("TextLabel")
+		label.Size = UDim2.fromScale(1, 1)
+		label.BackgroundTransparency = 1
+		label.Text = text
+		label.TextScaled = true
+		label.Font = Enum.Font.FredokaOne
+		label.TextColor3 = Color3.new(1, 1, 1)
+		label.Parent = gui
+	end
+	return m
+end
+
+-- A candy cane (straight shaft plus a hook of small spheres).
+function Props.candyCane(parent: Instance, cf: CFrame, height: number): Model
+	local m = B.model("CandyCane", parent)
+	local segs = math.floor(height / 0.8)
+	for i = 0, segs do
+		B.vcyl(m, "Shaft", cf * CFrame.new(0, i * 0.8 + 0.4, 0), 0.8, 0.8, if i % 2 == 0 then P.Red else P.Snow, nil, false)
+	end
+	for i = 1, 6 do
+		local a = i / 6 * math.pi
+		B.ball(m, "Hook", (cf * CFrame.new(-(1 - math.cos(a)) * 0.9, segs * 0.8 + 0.8 + math.sin(a) * 0.9, 0)).Position, 0.85, if i % 2 == 0 then P.Red else P.Snow, nil, false)
+	end
+	return m
+end
+
+return Props
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX00000018"><Properties><string name="Name">TownCenter</string><ProtectedString name="Source"><![CDATA[--!strict
+-- Area A: the town square with its giant tree, shops, benches and lights.
+local B = require(script.Parent.Builder)
+local Props = require(script.Parent.Props)
+local HP = require(script.Parent.HouseParts)
+local Layout = require(game:GetService("ReplicatedStorage").Shared.Config.Layout)
+local P = B.Palette
+
+local TownCenter = {}
+
+local function giantTree(parent: Instance, base: CFrame, height: number)
+	local m = B.model("GiantTree", parent)
+	B.vcyl(m, "Planter", base * CFrame.new(0, 1.2, 0), 2.4, 30, P.Stone, Enum.Material.Cobblestone)
+	B.vcyl(m, "PlanterSnow", base * CFrame.new(0, 2.6, 0), 0.6, 28, P.Snow, Enum.Material.Snow)
+	B.vcyl(m, "PlanterRim", base * CFrame.new(0, 2.5, 0), 0.5, 31, P.Gold, Enum.Material.Metal)
+	local trunkH = height * 0.12
+	B.vcyl(m, "Trunk", base * CFrame.new(0, 2.4 + trunkH / 2, 0), trunkH, 5, P.DarkWood, Enum.Material.Wood)
+	local tiers = 7
+	local rng = Random.new(12)
+	local ornamentColors = { P.Red, P.Gold, Color3.fromRGB(80, 150, 255), Color3.fromRGB(240, 240, 250), Color3.fromRGB(200, 70, 200) }
+	local y = 2.4 + trunkH * 0.6
+	local tierH = (height - trunkH) / tiers * 1.3
+	for i = 1, tiers do
+		local w = height * 0.55 * (1 - (i - 1) / (tiers + 0.5))
+		local tierCf = base * CFrame.new(0, y + tierH / 2, 0) * CFrame.Angles(0, i * 0.7, 0)
+		B.blob(m, "Tier", tierCf, Vector3.new(w, tierH, w), if i % 2 == 0 then P.Pine else P.PineDark, Enum.Material.Grass, i <= 2)
+		B.blob(m, "TierSnow", tierCf * CFrame.new(0, tierH * 0.3, 0), Vector3.new(w * 0.72, tierH * 0.4, w * 0.72), P.Snow, Enum.Material.Snow, false)
+		-- Big glass ornaments around the tier's widest ring.
+		local count = math.max(4, math.floor(w / 3.5))
+		for k = 1, count do
+			local a = (k / count) * math.pi * 2 + i
+			local r = w * 0.47
+			local pos = (base * CFrame.new(math.cos(a) * r, y + tierH * 0.45, math.sin(a) * r)).Position
+			local orb = B.ball(m, "Ornament", pos, rng:NextNumber(1.4, 2.2), ornamentColors[(k + i) % #ornamentColors + 1], Enum.Material.Glass, false)
+			orb.Reflectance = 0.25
+			orb.CastShadow = false
+		end
+		y += tierH * 0.66
+	end
+	-- Spiral of lights wound around the tree.
+	local prev: Vector3? = nil
+	local turns, steps = 4, 48
+	local bottom, top = 2.4 + trunkH, y
+	for s = 0, steps do
+		local t = s / steps
+		local yy = bottom + (top - bottom) * t
+		local radius = height * 0.29 * (1 - t) + 1
+		local a = t * turns * math.pi * 2
+		local p = (base * CFrame.new(math.cos(a) * radius, yy, math.sin(a) * radius)).Position
+		if prev then
+			B.stringLights(m, prev, p, 2.2, 0.1, if s % 6 == 0 then 1 else 0)
+		end
+		prev = p
+	end
+	-- Star.
+	local starCf = base * CFrame.new(0, top + 3, 0)
+	local star = B.part({ Name = "Star", Size = Vector3.new(5, 5, 1), CFrame = starCf * CFrame.Angles(0, 0, math.rad(45)), Color = P.Gold, Material = Enum.Material.Neon, CanCollide = false, Parent = m })
+	local star2 = B.part({ Name = "Star", Size = Vector3.new(5, 5, 1), CFrame = starCf, Color = P.Gold, Material = Enum.Material.Neon, CanCollide = false, Parent = m })
+	B.tag(star2, "SpinSlow")
+	B.pointLight(star, P.Gold, 50, 2)
+	B.tag(star, "SpinSlow")
+	return m, top
+end
+
+export type ShopSpec = {
+	name: string,
+	sign: string,
+	body: Color3,
+	trim: Color3,
+	awning: { Color3 },
+	roof: string, -- "gable" | "dome" | "curl" | "flat"
+	height: number,
+}
+
+-- `cf` = center of the shop's front edge on the ground, LookVector toward the street.
+local function shop(parent: Instance, cf: CFrame, spec: ShopSpec)
+	local m = B.model(spec.name, parent)
+	local W, D, Ht = 34, 24, spec.height
+	local H = cf * CFrame.new(0, 0, D / 2 + 6)
+	-- Shop sidewalk.
+	local walk = B.part({ Name = "ShopWalk", Size = Vector3.new(W + 8, 1.2, 8), CFrame = cf * CFrame.new(0, 0.2, 2.5), Color = P.Sidewalk, Material = Enum.Material.Concrete, Parent = m })
+	B.part({ Name = "WalkSnow", Size = Vector3.new(W + 8, 0.3, 1.6), CFrame = walk.CFrame * CFrame.new(0, 0.75, -3.2), Color = P.Snow, Material = Enum.Material.Snow, CastShadow = false, CanCollide = false, Parent = m })
+	B.part({ Name = "Foundation", Size = Vector3.new(W + 1, 1.2, D + 1), CFrame = H * CFrame.new(0, 0.5, 0), Color = P.Stone, Material = Enum.Material.Cobblestone, Parent = m })
+	B.part({ Name = "Body", Size = Vector3.new(W, Ht, D), CFrame = H * CFrame.new(0, 1.1 + Ht / 2, 0), Color = spec.body, Material = Enum.Material.Plaster, Parent = m })
+	-- Big glowing display windows and a door between them.
+	for _, sx in { -1, 1 } do
+		local win = B.part({ Name = "Display", Size = Vector3.new(11, 7, 0.3), CFrame = H * CFrame.new(sx * 9.5, 5.6, -D / 2 - 0.1), Color = P.Window, Material = Enum.Material.Neon, CastShadow = false, Parent = m })
+		B.part({ Name = "DisplayFrame", Size = Vector3.new(12, 8, 0.6), CFrame = win.CFrame * CFrame.new(0, 0, 0.25), Color = spec.trim, Material = Enum.Material.Wood, Parent = m })
+		local sill = B.part({ Name = "DisplaySill", Size = Vector3.new(12.6, 0.5, 1.4), CFrame = win.CFrame * CFrame.new(0, -4, -0.5), Color = spec.trim, Material = Enum.Material.Wood, Parent = m })
+		B.snowCap(m, sill, 0.3, -0.2)
+		-- Little wrapped gifts displayed in the window.
+		for k = -1, 1 do
+			Props.present(m, H * CFrame.new(sx * 9.5 + k * 3, 2.1, -D / 2 - 1.4), Vector3.new(1.4, 1.2, 1.2), spec.awning[(k + 2) % #spec.awning + 1])
+		end
+	end
+	HP.door(m, H * CFrame.new(0, 1.1, -D / 2), 5, 8.5, spec.trim, spec.trim:Lerp(Color3.new(1, 1, 1), 0.5), false)
+	-- Striped awning tilted out over the windows.
+	local stripes = 12
+	for i = 0, stripes - 1 do
+		local x = -W / 2 + (i + 0.5) * (W / stripes)
+		local stripe = B.part({ Name = "Awning", Size = Vector3.new(W / stripes, 0.3, 5), CFrame = H * CFrame.new(x, 11.4, -D / 2 - 2.3) * CFrame.Angles(math.rad(-22), 0, 0), Color = spec.awning[i % #spec.awning + 1], Material = Enum.Material.Fabric, Parent = m })
+		B.part({ Name = "AwningSnow", Size = Vector3.new(W / stripes, 0.3, 3.2), CFrame = stripe.CFrame * CFrame.new(0, 0.3, 0.6), Color = P.Snow, Material = Enum.Material.Snow, CastShadow = false, CanCollide = false, Parent = m })
+	end
+	-- Sign board with the shop name.
+	local signBoard = B.part({ Name = "Sign", Size = Vector3.new(20, 3, 0.5), CFrame = H * CFrame.new(0, 14.2, -D / 2 - 0.4), Color = spec.trim, Material = Enum.Material.Wood, Parent = m })
+	B.snowCap(m, signBoard, 0.3, 0)
+	local gui = Instance.new("SurfaceGui")
+	gui.Face = Enum.NormalId.Front
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	gui.PixelsPerStud = 30
+	gui.LightInfluence = 0
+	gui.Parent = signBoard
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.fromScale(1, 1)
+	label.BackgroundTransparency = 1
+	label.Text = spec.sign
+	label.TextScaled = true
+	label.Font = Enum.Font.FredokaOne
+	label.TextColor3 = Color3.fromRGB(255, 240, 200)
+	label.Parent = gui
+	-- Upper floor windows if tall enough.
+	if Ht > 18 then
+		for _, sx in { -1, 0, 1 } do
+			HP.window(m, H * CFrame.new(sx * 10, Ht - 3, -D / 2 - 0.1), 4, 4.5, spec.trim, true)
+		end
+	end
+	-- Roof variants.
+	local top = H * CFrame.new(0, 1.1 + Ht, 0)
+	if spec.roof == "gable" then
+		B.gableRoof(m, top, W, D, 9, 2, spec.trim:Lerp(Color3.new(0, 0, 0), 0.3), spec.body)
+	elseif spec.roof == "dome" then
+		local slab = B.part({ Name = "RoofSlab", Size = Vector3.new(W + 2, 1, D + 2), CFrame = top * CFrame.new(0, 0.5, 0), Color = spec.trim, Parent = m })
+		B.snowCap(m, slab, 0.6, -0.4)
+		local dome = B.blob(m, "Dome", top * CFrame.new(0, 4, 2), Vector3.new(16, 12, 16), spec.awning[1], Enum.Material.SmoothPlastic, true)
+		B.blob(m, "DomeSnow", dome.CFrame * CFrame.new(0, 3, 0), Vector3.new(12, 6, 12), P.Snow, Enum.Material.Snow, false)
+		local orb = B.ball(m, "Orb", (top * CFrame.new(0, 11, 2)).Position, 1.8, P.Gold, Enum.Material.Neon, false)
+		B.tag(orb, "XmasBulb")
+	elseif spec.roof == "curl" then
+		local c = top
+		local w, d = W + 2, D + 2
+		for i = 1, 6 do
+			c = c * CFrame.new(0, 1.2, 0)
+			local tier = B.part({ Name = "RoofTier", Size = Vector3.new(w, 2.4, d), CFrame = c, Color = if i % 2 == 0 then spec.trim else spec.awning[1], Material = Enum.Material.Slate, CanCollide = i <= 2, Parent = m })
+			B.part({ Name = "RoofSnow", Size = Vector3.new(w * 0.9, 0.4, d * 0.9), CFrame = tier.CFrame * CFrame.new(0, 1.4, 0), Color = P.Snow, Material = Enum.Material.Snow, CastShadow = false, CanCollide = false, Parent = m })
+			w *= 0.8
+			d *= 0.8
+			c = c * CFrame.new(0, 1.2, 0) * CFrame.Angles(math.rad(5 + i * 2), 0, 0)
+		end
+	else
+		local slab = B.part({ Name = "RoofSlab", Size = Vector3.new(W + 2, 1, D + 2), CFrame = top * CFrame.new(0, 0.5, 0), Color = spec.trim, Parent = m })
+		B.snowCap(m, slab, 0.8, -0.4)
+		-- Parapet with crenellations for a little whimsy.
+		for i = 0, 8 do
+			local x = -W / 2 + i * (W / 8)
+			local block = B.part({ Name = "Parapet", Size = Vector3.new(2, 2, 2), CFrame = top * CFrame.new(x, 2, -D / 2), Color = spec.trim, Parent = m })
+			B.snowCap(m, block, 0.4, 0)
+		end
+	end
+	HP.chimney(m, H * CFrame.new(W / 2 - 4, 1.1, D / 2 - 4), Ht + 9, 3)
+	-- Lights along the shop front.
+	B.stringLights(m, (H * CFrame.new(-W / 2, 12.8, -D / 2 - 0.6)).Position, (H * CFrame.new(W / 2, 12.8, -D / 2 - 0.6)).Position, 2.2, 0.7, 6)
+	-- Bench and lamppost out front.
+	Props.bench(m, cf * CFrame.new(-W / 2 + 4, 0.8, 4.5) * CFrame.Angles(0, math.pi, 0))
+	Props.lamppost(m, cf * CFrame.new(W / 2 + 2, 0.8, 4) * CFrame.Angles(0, math.pi / 2, 0), true)
+	return m
+end
+
+local SHOPS: { ShopSpec } = {
+	{ name = "CocoaCafe", sign = "Cocoa Cafe", body = Color3.fromRGB(150, 95, 70), trim = Color3.fromRGB(245, 230, 200), awning = { Color3.fromRGB(190, 50, 50), Color3.fromRGB(245, 240, 230) }, roof = "gable", height = 16 },
+	{ name = "ToyShoppe", sign = "Toy Shoppe", body = Color3.fromRGB(90, 130, 200), trim = Color3.fromRGB(250, 210, 80), awning = { Color3.fromRGB(250, 210, 80), Color3.fromRGB(230, 70, 70) }, roof = "curl", height = 20 },
+	{ name = "Bakery", sign = "Sugarplum Bakery", body = Color3.fromRGB(245, 190, 200), trim = Color3.fromRGB(140, 70, 100), awning = { Color3.fromRGB(240, 120, 160), Color3.fromRGB(255, 245, 250) }, roof = "dome", height = 16 },
+	{ name = "OrnamentEmporium", sign = "Ornaments", body = Color3.fromRGB(70, 120, 90), trim = Color3.fromRGB(230, 200, 120), awning = { Color3.fromRGB(200, 60, 60), Color3.fromRGB(230, 200, 120) }, roof = "flat", height = 22 },
+	{ name = "PostOffice", sign = "Post Office", body = Color3.fromRGB(200, 70, 60), trim = Color3.fromRGB(240, 240, 240), awning = { Color3.fromRGB(40, 90, 160), Color3.fromRGB(240, 240, 240) }, roof = "gable", height = 18 },
+	{ name = "SweetShop", sign = "Sweet Shop", body = Color3.fromRGB(180, 140, 220), trim = Color3.fromRGB(255, 255, 255), awning = { Color3.fromRGB(120, 210, 170), Color3.fromRGB(255, 255, 255) }, roof = "curl", height = 18 },
+	{ name = "Bookshop", sign = "Books & Tales", body = Color3.fromRGB(110, 80, 60), trim = Color3.fromRGB(220, 180, 120), awning = { Color3.fromRGB(60, 100, 70), Color3.fromRGB(220, 180, 120) }, roof = "flat", height = 20 },
+	{ name = "Tailor", sign = "Warm Woolens", body = Color3.fromRGB(230, 220, 160), trim = Color3.fromRGB(150, 50, 60), awning = { Color3.fromRGB(150, 50, 60), Color3.fromRGB(240, 230, 210) }, roof = "dome", height = 16 },
+}
+
+function TownCenter.build(map: Instance)
+	local area = B.folder("TownCenter", map)
+	local center = Layout.TownCenter
+	local half = Layout.PlazaHalf
+	local base = CFrame.new(center)
+
+	-- Plaza paving with a raised round center and four diagonal paths.
+	B.part({ Name = "Plaza", Size = Vector3.new(half * 2 + 8, 1, half * 2 + 8), CFrame = base * CFrame.new(0, 0.2, 0), Color = P.Cobble, Material = Enum.Material.Cobblestone, Parent = area })
+	B.part({ Name = "PlazaBorder", Size = Vector3.new(half * 2 + 10, 1.2, half * 2 + 10), CFrame = base * CFrame.new(0, 0.1, 0), Color = P.Sidewalk, Material = Enum.Material.Concrete, Parent = area })
+	B.vcyl(area, "Dais", base * CFrame.new(0, 0.9, 0), 0.6, 60, Color3.fromRGB(150, 140, 140), Enum.Material.Cobblestone)
+	B.vcyl(area, "DaisRing", base * CFrame.new(0, 0.95, 0), 0.6, 62, P.Gold, Enum.Material.Metal)
+	-- Snowy lawn quadrants with bushes and small trees.
+	local rng = Random.new(21)
+	for _, sx in { -1, 1 } do
+		for _, sz in { -1, 1 } do
+			local q = base * CFrame.new(sx * 46, 0, sz * 46)
+			B.part({ Name = "Lawn", Size = Vector3.new(34, 0.6, 34), CFrame = q * CFrame.new(0, 0.9, 0), Color = P.Snow, Material = Enum.Material.Snow, Parent = area })
+			B.part({ Name = "LawnEdge", Size = Vector3.new(35, 0.8, 35), CFrame = q * CFrame.new(0, 0.75, 0), Color = P.Stone, Material = Enum.Material.Cobblestone, Parent = area })
+			Props.pine(area, q * CFrame.new(sx * 8, 1.2, sz * 8), rng:NextNumber(18, 24), rng)
+			Props.bush(area, q * CFrame.new(-sx * 8, 1.2, sz * 8), 4)
+			Props.bush(area, q * CFrame.new(sx * 8, 1.2, -sz * 8), 4)
+			B.blob(area, "SnowMound", q * CFrame.new(-sx * 4, 1.2, -sz * 4), Vector3.new(10, 2.2, 8), P.Snow, Enum.Material.Snow, false)
+		end
+	end
+	-- Snowman family near the tree.
+	Props.snowman(area, base * CFrame.new(-20, 1.2, 20) * CFrame.Angles(0, math.rad(-135), 0), 1.2)
+	Props.snowman(area, base * CFrame.new(-25, 1.2, 16) * CFrame.Angles(0, math.rad(-120), 0), 0.7)
+
+	local _, treeTop = giantTree(area, base * CFrame.new(0, 1.2, 0), 64)
+
+	-- Benches facing the tree.
+	for i = 0, 7 do
+		local a = (i + 0.5) / 8 * math.pi * 2
+		local pos = center + Vector3.new(math.cos(a) * 26, 1.2, math.sin(a) * 26)
+		Props.bench(area, CFrame.lookAt(pos, Vector3.new(center.X, pos.Y, center.Z)) * CFrame.Angles(0, math.pi, 0))
+	end
+	-- Light poles around the plaza edge; garlands run from the tree top to them.
+	local poleTops = {}
+	for i = 0, 7 do
+		local a = i / 8 * math.pi * 2
+		local pos = center + Vector3.new(math.cos(a) * 60, 0.7, math.sin(a) * 60)
+		local pole = B.model("GarlandPole", area)
+		B.vcyl(pole, "Pole", CFrame.new(pos + Vector3.new(0, 9, 0)), 18, 0.8, P.Red, Enum.Material.SmoothPlastic)
+		for s = 0, 5 do
+			B.vcyl(pole, "Stripe", CFrame.new(pos + Vector3.new(0, 1.5 + s * 3, 0)), 0.8, 0.85, P.Snow, nil, false)
+		end
+		local cap = B.ball(pole, "Cap", pos + Vector3.new(0, 18.4, 0), 1.6, P.Gold, Enum.Material.Metal)
+		table.insert(poleTops, cap.Position)
+		local lampPos = pos + (Vector3.new(center.X, pos.Y, center.Z) - pos).Unit * 4
+		Props.lamppost(area, CFrame.lookAt(lampPos, Vector3.new(center.X, pos.Y, center.Z)), i % 2 == 0)
+	end
+	local apex = center + Vector3.new(0, treeTop - 6, 0)
+	for _, p in poleTops do
+		B.stringLights(area, apex, p, 3, 3, 6)
+	end
+
+	-- Shops around the outside of the ring road.
+	local R = Layout.RingRoad
+	local W = Layout.RoadWidth
+	local front = R + W / 2 + 2
+	local placements = {
+		CFrame.lookAt(Vector3.new(-52, 0, -front), Vector3.new(-52, 0, 0)),
+		CFrame.lookAt(Vector3.new(52, 0, -front), Vector3.new(52, 0, 0)),
+		CFrame.lookAt(Vector3.new(-52, 0, front), Vector3.new(-52, 0, 0)),
+		CFrame.lookAt(Vector3.new(52, 0, front), Vector3.new(52, 0, 0)),
+		CFrame.lookAt(Vector3.new(front, 0, -56), Vector3.new(0, 0, -56)),
+		CFrame.lookAt(Vector3.new(front, 0, 56), Vector3.new(0, 0, 56)),
+		CFrame.lookAt(Vector3.new(-front, 0, -56), Vector3.new(0, 0, -56)),
+		CFrame.lookAt(Vector3.new(-front, 0, 56), Vector3.new(0, 0, 56)),
+	}
+	local shops = B.folder("Shops", area)
+	for i, cf in placements do
+		-- lookAt faces the street; shops expect LookVector toward the street, so the
+		-- building extends backward (local +Z) away from the plaza.
+		shop(shops, cf, SHOPS[i])
+	end
+
+	-- Street lights strung across the side streets where they leave the ring.
+	local arches = B.folder("StreetArches", area)
+	local function arch(a: Vector3, b: Vector3)
+		Props.lamppost(arches, CFrame.lookAt(a, b))
+		Props.lamppost(arches, CFrame.lookAt(b, a))
+		B.stringLights(arches, a + Vector3.new(0, 13, 0), b + Vector3.new(0, 13, 0), 2.4, 3, 5)
+	end
+	local edge = W / 2 + 3
+	arch(Vector3.new(-R - W / 2 - 10, 0.7, -edge), Vector3.new(-R - W / 2 - 10, 0.7, edge)) -- Holly Lane
+	arch(Vector3.new(R + W / 2 + 10, 0.7, -edge), Vector3.new(R + W / 2 + 10, 0.7, edge)) -- Evergreen Way
+	arch(Vector3.new(-edge, 0.7, -R - W / 2 - 10), Vector3.new(edge, 0.7, -R - W / 2 - 10)) -- Mansion Row
+	arch(Vector3.new(-edge, 0.7, R + W / 2 + 10), Vector3.new(edge, 0.7, R + W / 2 + 10)) -- Summit Road
+
+	-- Street signs at each junction.
+	Props.streetSign(area, CFrame.new(-R - W / 2 - 4, 0.7, -edge - 6), "Holly Lane")
+	Props.streetSign(area, CFrame.new(R + W / 2 + 4, 0.7, -edge - 6), "Evergreen Way")
+	Props.streetSign(area, CFrame.new(edge + 6, 0.7, -R - W / 2 - 4) * CFrame.Angles(0, math.pi / 2, 0), "Mansion Row")
+	Props.streetSign(area, CFrame.new(edge + 6, 0.7, R + W / 2 + 4) * CFrame.Angles(0, math.pi / 2, 0), "Summit Trail")
+	return area
+end
+
+return TownCenter
+]]></ProtectedString></Properties></Item></Item></Item></Item><Item class="StarterPlayer" referent="RBX00000030"><Properties><string name="Name">StarterPlayer</string></Properties><Item class="StarterPlayerScripts" referent="RBX0000002F"><Properties><string name="Name">StarterPlayerScripts</string></Properties><Item class="Folder" referent="RBX0000002E"><Properties><string name="Name">Client</string></Properties><Item class="Folder" referent="RBX0000001E"><Properties><string name="Name">Audio</string></Properties><Item class="ModuleScript" referent="RBX0000001C"><Properties><string name="Name">MusicController</string><ProtectedString name="Source"><![CDATA[--!strict
+-- Music state machine with crossfades.
+-- States: Menu, Outside, Inside, Detected, Victory (see Shared/Config/Audio).
+-- Phase 1 uses Menu and Outside; Inside switches automatically when the
+-- player stands in an InteriorZone. Detected/Victory are ready for later phases.
+local SoundService = game:GetService("SoundService")
+local TweenService = game:GetService("TweenService")
+
+local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
+local AudioConfig = require(Shared.Config.Audio)
+local Settings = require(script.Parent.Parent.Settings)
+
+local MusicController = {}
+
+local group = Instance.new("SoundGroup")
+group.Name = "Music"
+group.Parent = SoundService
+
+local sounds: { [string]: Sound } = {}
+local current: string? = nil
+local fadeInfo = TweenInfo.new(AudioConfig.CrossfadeTime, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+
+for state, track in AudioConfig.Tracks do
+	if track.SoundId ~= "" then
+		local s = Instance.new("Sound")
+		s.Name = state
+		s.SoundId = track.SoundId
+		s.Looped = track.Looped
+		s.Volume = 0
+		s.SoundGroup = group
+		s:SetAttribute("TargetVolume", track.Volume)
+		s.Parent = group
+		sounds[state] = s
+	end
+end
+
+local function applyGroupVolume()
+	local enabled = Settings.get("MusicEnabled")
+	local vol = if enabled then Settings.get("MusicVolume") else 0
+	TweenService:Create(group, TweenInfo.new(0.3), { Volume = vol }):Play()
+end
+
+-- Switch to a music state; same state is a no-op. Missing tracks fade to silence.
+function MusicController.setState(state: string)
+	if state == current then
+		return
+	end
+	local old = if current then sounds[current] else nil
+	current = state
+	if old then
+		local t = TweenService:Create(old, fadeInfo, { Volume = 0 })
+		t:Play()
+		t.Completed:Once(function()
+			if current ~= old.Name then
+				old:Stop()
+			end
+		end)
+	end
+	local new = sounds[state]
+	if new then
+		if not new.IsPlaying then
+			new.TimePosition = 0
+			new:Play()
+		end
+		TweenService:Create(new, fadeInfo, { Volume = new:GetAttribute("TargetVolume") :: number }):Play()
+	end
+end
+
+function MusicController.getState(): string?
+	return current
+end
+
+-- Plays a one-shot stinger (e.g. Victory) then returns to the previous state.
+function MusicController.playStinger(state: string, returnTo: string)
+	local s = sounds[state]
+	if not s then
+		return
+	end
+	MusicController.setState(state)
+	s.Ended:Once(function()
+		if current == state then
+			MusicController.setState(returnTo)
+		end
+	end)
+end
+
+function MusicController.hasTrack(state: string): boolean
+	return sounds[state] ~= nil
+end
+
+Settings.Changed:Connect(function(key)
+	if key == "MusicEnabled" or key == "MusicVolume" then
+		applyGroupVolume()
+	end
+end)
+applyGroupVolume()
+
+return MusicController
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX0000001D"><Properties><string name="Name">MusicZones</string><ProtectedString name="Source"><![CDATA[--!strict
+-- Picks the music state from where the player's character is standing.
+-- Outside by default, Inside within any part tagged "InteriorZone".
+-- Later phases can override with MusicZones.setOverride("Detected") etc.
+local CollectionService = game:GetService("CollectionService")
+local Players = game:GetService("Players")
+
+local Music = require(script.Parent.MusicController)
+
+local MusicZones = {}
+
+local override: string? = nil
+local running = false
+
+local function inZone(pos: Vector3): boolean
+	for _, zone in CollectionService:GetTagged("InteriorZone") do
+		if zone:IsA("BasePart") then
+			local localPos = zone.CFrame:PointToObjectSpace(pos)
+			local half = zone.Size / 2
+			if math.abs(localPos.X) <= half.X and math.abs(localPos.Y) <= half.Y and math.abs(localPos.Z) <= half.Z then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+function MusicZones.setOverride(state: string?)
+	override = state
+end
+
+function MusicZones.start()
+	if running then
+		return
+	end
+	running = true
+	task.spawn(function()
+		while running do
+			local character = Players.LocalPlayer.Character
+			local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+			if override then
+				Music.setState(override)
+			elseif root then
+				-- Until an Inside track is configured, keep the outside music playing indoors.
+				local inside = inZone(root.Position) and Music.hasTrack("Inside")
+				Music.setState(if inside then "Inside" else "Outside")
+			end
+			task.wait(0.5)
+		end
+	end)
+end
+
+function MusicZones.stop()
+	running = false
+end
+
+return MusicZones
+]]></ProtectedString></Properties></Item></Item><Item class="Folder" referent="RBX00000021"><Properties><string name="Name">Effects</string></Properties><Item class="ModuleScript" referent="RBX0000001F"><Properties><string name="Name">LightAnimator</string><ProtectedString name="Source"><![CDATA[--!strict
+-- Client-side decoration animation:
+--   XmasBulb  - parts cycle through bulb colors in a chasing pattern
+--   Flicker   - lanterns/fires gently flicker their light brightness
+--   SpinSlow  - slowly rotates (tree star)
+-- Only parts near the camera are updated to keep it cheap.
+local CollectionService = game:GetService("CollectionService")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+
+local Settings = require(script.Parent.Parent.Settings)
+
+local LightAnimator = {}
+
+local COLORS = {
+	Color3.fromRGB(255, 70, 70),
+	Color3.fromRGB(80, 220, 110),
+	Color3.fromRGB(255, 200, 60),
+	Color3.fromRGB(80, 150, 255),
+	Color3.fromRGB(255, 120, 220),
+}
+local RANGE = 300
+
+function LightAnimator.start()
+	local phase = 0
+	local baseBrightness: { [Light]: number } = {}
+
+	task.spawn(function()
+		while true do
+			task.wait(0.6)
+			if Settings.get("AnimatedLights") then
+				phase += 1
+				local cam = Workspace.CurrentCamera
+				local camPos = if cam then cam.CFrame.Position else Vector3.zero
+				for _, bulb in CollectionService:GetTagged("XmasBulb") do
+					if bulb:IsA("BasePart") and (bulb.Position - camPos).Magnitude < RANGE then
+						local i = (bulb:GetAttribute("Index") :: number?) or 0
+						local color = COLORS[((i + phase) % #COLORS) + 1]
+						bulb.Color = color
+						local light = bulb:FindFirstChildOfClass("PointLight")
+						if light then
+							light.Color = color
+						end
+					end
+				end
+			end
+		end
+	end)
+
+	local t = 0
+	RunService.Heartbeat:Connect(function(dt)
+		t += dt
+		local cam = Workspace.CurrentCamera
+		local camPos = if cam then cam.CFrame.Position else Vector3.zero
+		for _, part in CollectionService:GetTagged("Flicker") do
+			if part:IsA("BasePart") and (part.Position - camPos).Magnitude < 150 then
+				local light = part:FindFirstChildWhichIsA("Light")
+				if light then
+					local base = baseBrightness[light]
+					if not base then
+						base = light.Brightness
+						baseBrightness[light] = base
+					end
+					local seed = part.Position.X * 0.37 + part.Position.Z * 0.11
+					light.Brightness = base * (0.85 + 0.15 * math.noise(t * 3, seed))
+				end
+			end
+		end
+		for _, part in CollectionService:GetTagged("SpinSlow") do
+			if part:IsA("BasePart") then
+				-- Rotate about world Y so multi-part stars stay aligned.
+				local pos = part.Position
+				part.CFrame = CFrame.new(pos) * CFrame.Angles(0, dt * 0.4, 0) * (part.CFrame - pos)
+			end
+		end
+	end)
+end
+
+return LightAnimator
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX00000020"><Properties><string name="Name">Snowfall</string><ProtectedString name="Source"><![CDATA[--!strict
+-- World snowfall that follows the camera. Rate scales with the Snow Quality
+-- setting so low-end devices can turn it down or off.
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+
+local Settings = require(script.Parent.Parent.Settings)
+
+local Snowfall = {}
+
+local RATES = { Off = 0, Low = 60, Medium = 160, High = 340 }
+
+function Snowfall.start()
+	local emitterPart = Instance.new("Part")
+	emitterPart.Name = "SnowEmitter"
+	emitterPart.Anchored = true
+	emitterPart.CanCollide = false
+	emitterPart.CanQuery = false
+	emitterPart.CanTouch = false
+	emitterPart.Transparency = 1
+	emitterPart.Size = Vector3.new(180, 1, 180)
+	emitterPart.Parent = Workspace.CurrentCamera
+
+	local e = Instance.new("ParticleEmitter")
+	e.Texture = "rbxasset://textures/particles/smoke_main.dds"
+	e.Color = ColorSequence.new(Color3.new(1, 1, 1))
+	e.LightEmission = 0.4
+	e.LightInfluence = 0.6
+	e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(1, 0.25) })
+	e.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.1, 0.1), NumberSequenceKeypoint.new(0.85, 0.2), NumberSequenceKeypoint.new(1, 1) })
+	e.Lifetime = NumberRange.new(7, 10)
+	e.Speed = NumberRange.new(6, 9)
+	e.EmissionDirection = Enum.NormalId.Bottom
+	e.SpreadAngle = Vector2.new(15, 15)
+	e.Acceleration = Vector3.new(1.5, 0, 0.8)
+	e.RotSpeed = NumberRange.new(-40, 40)
+	e.Rotation = NumberRange.new(0, 360)
+	e.Shape = Enum.ParticleEmitterShape.Box
+	e.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+	e.Parent = emitterPart
+
+	local function apply()
+		local rate = RATES[Settings.get("SnowQuality")] or 0
+		e.Rate = rate
+		e.Enabled = rate > 0
+	end
+	apply()
+	Settings.Changed:Connect(function(key)
+		if key == "SnowQuality" then
+			apply()
+		end
+	end)
+
+	RunService.RenderStepped:Connect(function()
+		local cam = Workspace.CurrentCamera
+		if cam then
+			local p = cam.CFrame.Position
+			emitterPart.CFrame = CFrame.new(p.X, p.Y + 45, p.Z) + cam.CFrame.LookVector * Vector3.new(40, 0, 40)
+		end
+	end)
+end
+
+return Snowfall
+]]></ProtectedString></Properties></Item></Item><Item class="LocalScript" referent="RBX00000022"><Properties><string name="Name">Main</string><ProtectedString name="Source"><![CDATA[--!strict
+-- Client entry point.
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterGui = game:GetService("StarterGui")
+
+-- Hide default Roblox UI that clutters the menu (chat stays available).
+pcall(function()
+	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, false)
+	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
+end)
+
+if not ReplicatedStorage:GetAttribute("WorldReady") then
+	ReplicatedStorage:GetAttributeChangedSignal("WorldReady"):Wait()
+end
+
+require(script.Parent.Effects.Snowfall).start()
+require(script.Parent.Effects.LightAnimator).start()
+require(script.Parent.UI.MenuController).start()
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX00000023"><Properties><string name="Name">MenuCamera</string><ProtectedString name="Source"><![CDATA[--!strict
+-- Cinematic camera for the main menu: slow glides between shots over town.
+local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
+
+local Layout = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared").Config.Layout)
+
+local MenuCamera = {}
+
+local SHOTS = {
+	{ from = Layout.MenuCamera.Position, to = Layout.MenuCamera.Position + Vector3.new(90, -10, -30), look = Layout.MenuCamera.LookAt },
+	{ from = Vector3.new(70, 45, 90), to = Vector3.new(-60, 55, 95), look = Vector3.new(0, 30, 0) },
+	{ from = Vector3.new(-300, 40, 70), to = Vector3.new(-200, 35, 75), look = Vector3.new(-260, 12, -40) },
+	{ from = Vector3.new(80, 170, 560), to = Vector3.new(-60, 175, 570), look = Vector3.new(-80, 0, 0) },
+}
+local SHOT_TIME = 14
+
+local running = false
+local current: Tween? = nil
+
+function MenuCamera.start()
+	if running then
+		return
+	end
+	running = true
+	local cam = Workspace.CurrentCamera
+	cam.CameraType = Enum.CameraType.Scriptable
+	cam.FieldOfView = 60
+	task.spawn(function()
+		local i = 1
+		while running do
+			local shot = SHOTS[i]
+			cam.CFrame = CFrame.lookAt(shot.from, shot.look)
+			current = TweenService:Create(cam, TweenInfo.new(SHOT_TIME, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { CFrame = CFrame.lookAt(shot.to, shot.look) })
+			current:Play()
+			local elapsed = 0
+			while running and elapsed < SHOT_TIME do
+				elapsed += task.wait(0.1)
+			end
+			i = i % #SHOTS + 1
+		end
+	end)
+end
+
+function MenuCamera.stop()
+	running = false
+	if current then
+		current:Cancel()
+		current = nil
+	end
+	local cam = Workspace.CurrentCamera
+	cam.CameraType = Enum.CameraType.Custom
+	cam.FieldOfView = 70
+end
+
+return MenuCamera
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX00000024"><Properties><string name="Name">Settings</string><ProtectedString name="Source"><![CDATA[--!strict
+-- Player settings for this session, with a change signal.
+-- (Saving settings between sessions needs a DataStore; planned with the
+-- economy/progression phase.)
+local Settings = {}
+
+export type Values = {
+	MusicEnabled: boolean,
+	MusicVolume: number, -- 0..1
+	SnowQuality: string, -- "Off" | "Low" | "Medium" | "High"
+	AnimatedLights: boolean,
+}
+
+local values: Values = {
+	MusicEnabled = true,
+	MusicVolume = 0.7,
+	SnowQuality = "Medium",
+	AnimatedLights = true,
+}
+
+local changed = Instance.new("BindableEvent")
+Settings.Changed = changed.Event -- (key: string, value: any)
+
+Settings.SnowLevels = { "Off", "Low", "Medium", "High" }
+
+function Settings.get(key: string): any
+	return (values :: any)[key]
+end
+
+function Settings.set(key: string, value: any)
+	if (values :: any)[key] == value then
+		return
+	end
+	(values :: any)[key] = value
+	changed:Fire(key, value)
+end
+
+return Settings
+]]></ProtectedString></Properties></Item><Item class="Folder" referent="RBX0000002D"><Properties><string name="Name">UI</string></Properties><Item class="ModuleScript" referent="RBX00000025"><Properties><string name="Name">MenuController</string><ProtectedString name="Source"><![CDATA[--!strict
+-- Builds the menu GUI, routes between screens with transitions, and hands
+-- off to Free Roam (and back).
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local Theme = require(script.Parent.Theme)
+local Remotes = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared").Remotes)
+local Music = require(script.Parent.Parent.Audio.MusicController)
+local MusicZones = require(script.Parent.Parent.Audio.MusicZones)
+local MenuCamera = require(script.Parent.Parent.MenuCamera)
+
+local MenuController = {}
+
+local player = Players.LocalPlayer
+local DESIGN = Vector2.new(1240, 720)
+
+local gui: ScreenGui
+local root: Frame
+local overlay: Frame
+local hud: ScreenGui
+local snowLayer: Frame
+local screens: { [string]: { frame: Frame, onShow: ((any?) -> ())? } } = {}
+local currentName: string? = nil
+local busy = false
+
+local IN_INFO = TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+local OUT_INFO = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+
+local function groupOf(frame: Frame): CanvasGroup
+	return frame:FindFirstChild("Group") :: CanvasGroup
+end
+
+local router = {}
+function router.show(name: string, params: any?)
+	local target = screens[name]
+	if not target or busy then
+		return
+	end
+	busy = true
+	local old = if currentName then screens[currentName] else nil
+	if old and old ~= target then
+		local g = groupOf(old.frame)
+		Theme.tween(g, OUT_INFO, { GroupTransparency = 1, Position = UDim2.new(0, -40, 0, 0) }).Completed:Wait()
+		old.frame.Visible = false
+	end
+	currentName = name
+	if target.onShow then
+		target.onShow(params)
+	end
+	local g = groupOf(target.frame)
+	g.GroupTransparency = 1
+	g.Position = UDim2.new(0, 40, 0, 0)
+	target.frame.Visible = true
+	Theme.tween(g, IN_INFO, { GroupTransparency = 0, Position = UDim2.new() })
+	busy = false
+end
+
+local function toast(text: string)
+	local t = Instance.new("TextLabel")
+	t.AnchorPoint = Vector2.new(0.5, 1)
+	t.Position = UDim2.new(0.5, 0, 1, 40)
+	t.Size = UDim2.new(0, 640, 0, 50)
+	t.BackgroundColor3 = Theme.Colors.Night
+	t.BackgroundTransparency = 0.1
+	t.Text = text
+	t.TextWrapped = true
+	t.FontFace = Theme.Fonts.Body
+	t.TextSize = 18
+	t.TextColor3 = Theme.Colors.Snow
+	t.ZIndex = 20
+	Theme.corner(t, 12)
+	Theme.stroke(t, Theme.Colors.Gold, 2, 0.4)
+	t.Parent = root
+	Theme.tween(t, IN_INFO, { Position = UDim2.new(0.5, 0, 1, -20) })
+	task.delay(3, function()
+		Theme.tween(t, OUT_INFO, { Position = UDim2.new(0.5, 0, 1, 60), TextTransparency = 1, BackgroundTransparency = 1 }).Completed:Wait()
+		t:Destroy()
+	end)
+end
+
+local function fade(to: number, time: number)
+	overlay.Visible = true
+	Theme.tween(overlay, TweenInfo.new(time, Enum.EasingStyle.Sine), { BackgroundTransparency = to }).Completed:Wait()
+	if to >= 1 then
+		overlay.Visible = false
+	end
+end
+
+-- Decorative falling snowflakes in front of the menu backdrop.
+local function startMenuSnow()
+	snowLayer = Instance.new("Frame")
+	snowLayer.Name = "MenuSnow"
+	snowLayer.BackgroundTransparency = 1
+	snowLayer.Size = UDim2.fromScale(1, 1)
+	snowLayer.ZIndex = 0
+	snowLayer.Parent = gui
+	local flakes = {}
+	local rng = Random.new()
+	for i = 1, 45 do
+		local f = Instance.new("Frame")
+		local s = rng:NextNumber(3, 8)
+		f.Size = UDim2.new(0, s, 0, s)
+		f.BackgroundColor3 = Color3.new(1, 1, 1)
+		f.BackgroundTransparency = rng:NextNumber(0.2, 0.6)
+		f.BorderSizePixel = 0
+		Theme.corner(f, 8)
+		f.Parent = snowLayer
+		flakes[i] = { frame = f, x = rng:NextNumber(), y = rng:NextNumber(), speed = rng:NextNumber(0.03, 0.08), sway = rng:NextNumber(0, 6.28) }
+	end
+	local t = 0
+	RunService.RenderStepped:Connect(function(dt)
+		if not snowLayer.Visible then
+			return
+		end
+		t += dt
+		for _, fl in flakes do
+			fl.y += fl.speed * dt
+			if fl.y > 1.05 then
+				fl.y = -0.05
+				fl.x = rng:NextNumber()
+			end
+			fl.frame.Position = UDim2.fromScale(fl.x + math.sin(t + fl.sway) * 0.01, fl.y)
+		end
+	end)
+end
+
+local function buildHud()
+	hud = Instance.new("ScreenGui")
+	hud.Name = "FreeRoamHUD"
+	hud.ResetOnSpawn = false
+	hud.IgnoreGuiInset = false
+	hud.Enabled = false
+	hud.Parent = player:WaitForChild("PlayerGui")
+	local holder = Instance.new("Frame")
+	holder.BackgroundTransparency = 1
+	holder.Position = UDim2.new(0, 70, 0, 8)
+	holder.Size = UDim2.new(0, 120, 0, 46)
+	holder.Parent = hud
+	Theme.button(holder, { text = "MENU", color = Theme.Colors.Red, darkColor = Theme.Colors.RedDark, size = UDim2.fromScale(1, 1), textSize = 20 }, function()
+		MenuController.returnToMenu()
+	end)
+	local tip = Theme.label(hud, "Free Roam: explore the town, Holly Lane, and the hideout up Summit Trail.", Theme.Fonts.Body, 16, Theme.Colors.Snow)
+	tip.AnchorPoint = Vector2.new(0.5, 0)
+	tip.Position = UDim2.new(0.5, 0, 0, 12)
+	tip.Size = UDim2.new(0, 600, 0, 24)
+	local s = Instance.new("UIStroke")
+	s.Thickness = 2
+	s.Color = Theme.Colors.Night
+	s.Parent = tip
+	task.delay(8, function()
+		Theme.tween(tip, TweenInfo.new(1), { TextTransparency = 1 })
+		Theme.tween(s, TweenInfo.new(1), { Transparency = 1 })
+	end)
+	-- Reserved: future sleigh speedometer (bottom center) and gift meter.
+	local reserved = Instance.new("Frame")
+	reserved.Name = "SleighHUDSlot"
+	reserved.BackgroundTransparency = 1
+	reserved.AnchorPoint = Vector2.new(0.5, 1)
+	reserved.Position = UDim2.new(0.5, 0, 1, -16)
+	reserved.Size = UDim2.new(0, 360, 0, 120)
+	reserved.Parent = hud
+end
+
+function MenuController.startFreeRoam(missionId: string)
+	if busy then
+		return
+	end
+	busy = true
+	fade(0, 0.5)
+	Remotes.get("StartFreeRoam"):FireServer(missionId)
+	local character = player.Character or player.CharacterAdded:Wait()
+	character:WaitForChild("HumanoidRootPart", 10)
+	MenuCamera.stop()
+	gui.Enabled = false
+	hud.Enabled = true
+	Music.setState("Outside")
+	MusicZones.start()
+	task.wait(0.3)
+	busy = false
+	fade(1, 0.6)
+end
+
+function MenuController.returnToMenu()
+	if busy then
+		return
+	end
+	busy = true
+	fade(0, 0.4)
+	MusicZones.stop()
+	Remotes.get("ReturnToMenu"):FireServer()
+	hud.Enabled = false
+	gui.Enabled = true
+	MenuCamera.start()
+	Music.setState("Menu")
+	busy = false
+	router.show("MainMenu")
+	fade(1, 0.6)
+end
+
+function MenuController.start()
+	gui = Instance.new("ScreenGui")
+	gui.Name = "MainMenu"
+	gui.ResetOnSpawn = false
+	gui.IgnoreGuiInset = true
+	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	gui.Parent = player:WaitForChild("PlayerGui")
+
+	-- Soft vignette so the UI reads over the bright town.
+	local vignette = Instance.new("Frame")
+	vignette.Name = "Vignette"
+	vignette.Size = UDim2.fromScale(1, 1)
+	vignette.BackgroundColor3 = Theme.Colors.Night
+	vignette.BorderSizePixel = 0
+	local vg = Instance.new("UIGradient")
+	vg.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.25), NumberSequenceKeypoint.new(0.45, 0.8), NumberSequenceKeypoint.new(1, 0.35) })
+	vg.Rotation = 90
+	vg.Parent = vignette
+	vignette.Parent = gui
+
+	startMenuSnow()
+
+	-- Fixed-size design container scaled to fit any screen (desktop, tablet, phone).
+	root = Instance.new("Frame")
+	root.Name = "Root"
+	root.BackgroundTransparency = 1
+	root.AnchorPoint = Vector2.new(0.5, 0.5)
+	root.Position = UDim2.fromScale(0.5, 0.5)
+	root.Size = UDim2.fromOffset(DESIGN.X, DESIGN.Y)
+	root.Parent = gui
+	local scale = Instance.new("UIScale")
+	scale.Parent = root
+	local function rescale()
+		local vp = workspace.CurrentCamera.ViewportSize
+		scale.Scale = math.clamp(math.min(vp.X / DESIGN.X, vp.Y / DESIGN.Y), 0.35, 1.4)
+	end
+	rescale()
+	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(rescale)
+
+	overlay = Instance.new("Frame")
+	overlay.Name = "Fade"
+	overlay.Size = UDim2.fromScale(1, 1)
+	overlay.BackgroundColor3 = Color3.new(0, 0, 0)
+	overlay.BackgroundTransparency = 0
+	overlay.ZIndex = 50
+	overlay.Parent = gui
+
+	local ctx = { root = root, router = router, toast = toast, startFreeRoam = MenuController.startFreeRoam }
+	local Screens = script.Parent.Screens
+	for _, name in { "MainMenu", "MissionSelect", "Party", "Upgrades", "SettingsScreen" } do
+		local frame, onShow = require(Screens[name])(ctx)
+		screens[if name == "SettingsScreen" then "Settings" else name] = { frame = frame, onShow = onShow }
+	end
+
+	buildHud()
+	MenuCamera.start()
+	Music.setState("Menu")
+	router.show("MainMenu")
+	fade(1, 1.2)
+end
+
+return MenuController
+]]></ProtectedString></Properties></Item><Item class="Folder" referent="RBX0000002B"><Properties><string name="Name">Screens</string></Properties><Item class="ModuleScript" referent="RBX00000026"><Properties><string name="Name">MainMenu</string><ProtectedString name="Source"><![CDATA[--!strict
+-- Title screen with the four main buttons.
+local Theme = require(script.Parent.Parent.Theme)
+local GameInfo = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared").Config.GameInfo)
+
+return function(ctx: any)
+	local screen = Theme.screen(ctx.root, "MainMenu")
+	local group = screen:FindFirstChild("Group") :: CanvasGroup
+
+	-- Title block.
+	local titleHolder = Instance.new("Frame")
+	titleHolder.Name = "Title"
+	titleHolder.BackgroundTransparency = 1
+	titleHolder.AnchorPoint = Vector2.new(0.5, 0)
+	titleHolder.Position = UDim2.new(0.5, 0, 0, 30)
+	titleHolder.Size = UDim2.new(0, 900, 0, 190)
+	titleHolder.Parent = group
+
+	local title = Theme.label(titleHolder, GameInfo.Title, Theme.Fonts.Title, 96, Theme.Colors.Snow)
+	title.Size = UDim2.new(1, 0, 0, 120)
+	title.TextScaled = true
+	local grad = Instance.new("UIGradient")
+	grad.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+		ColorSequenceKeypoint.new(0.55, Color3.fromRGB(255, 236, 170)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(246, 190, 80)),
+	})
+	grad.Rotation = 90
+	grad.Parent = title
+	local outline = Instance.new("UIStroke")
+	outline.Color = Theme.Colors.RedDark
+	outline.Thickness = 5
+	outline.Parent = title
+
+	local sub = Theme.label(titleHolder, GameInfo.Subtitle:upper(), Theme.Fonts.Heading, 28, Theme.Colors.Gold)
+	sub.Position = UDim2.new(0, 0, 0, 122)
+	sub.Size = UDim2.new(1, 0, 0, 34)
+	local subStroke = Instance.new("UIStroke")
+	subStroke.Color = Theme.Colors.Night
+	subStroke.Thickness = 2
+	subStroke.Parent = sub
+
+	-- Gentle bob on the title.
+	task.spawn(function()
+		local up = true
+		while title.Parent do
+			Theme.tween(title, TweenInfo.new(2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { Position = UDim2.new(0, 0, 0, if up then -6 else 4) })
+			up = not up
+			task.wait(2.4)
+		end
+	end)
+
+	-- Buttons.
+	local column = Instance.new("Frame")
+	column.Name = "Buttons"
+	column.BackgroundTransparency = 1
+	column.AnchorPoint = Vector2.new(0.5, 0)
+	column.Position = UDim2.new(0.5, 0, 0, 250)
+	column.Size = UDim2.new(0, 400, 0, 360)
+	column.Parent = group
+	local list = Instance.new("UIListLayout")
+	list.Padding = UDim.new(0, 16)
+	list.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	list.SortOrder = Enum.SortOrder.LayoutOrder
+	list.Parent = column
+
+	local buttons = {
+		{ "SINGLE PLAYER", Theme.Colors.Red, Theme.Colors.RedDark, function()
+			ctx.router.show("MissionSelect", { mode = "Solo" })
+		end },
+		{ "MULTIPLAYER", Theme.Colors.Green, Theme.Colors.GreenDark, function()
+			ctx.router.show("Party")
+		end },
+		{ "UPGRADES", Color3.fromRGB(220, 150, 40), Color3.fromRGB(150, 95, 20), function()
+			ctx.router.show("Upgrades")
+		end },
+		{ "SETTINGS", Theme.Colors.PanelLight, Theme.Colors.Night, function()
+			ctx.router.show("Settings")
+		end },
+	}
+	for i, b in buttons do
+		local btn = Theme.button(column, { text = b[1], color = b[2], darkColor = b[3], size = UDim2.new(1, 0, 0, 70), textSize = 30 }, b[4])
+		;(btn.Parent :: Frame).LayoutOrder = i
+	end
+
+	local footer = Theme.label(group, GameInfo.Version, Theme.Fonts.Body, 14, Theme.Colors.Muted)
+	footer.AnchorPoint = Vector2.new(1, 1)
+	footer.Position = UDim2.new(1, -10, 1, -6)
+	footer.Size = UDim2.new(0, 200, 0, 20)
+	footer.TextXAlignment = Enum.TextXAlignment.Right
+
+	return screen
+end
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX00000027"><Properties><string name="Name">MissionSelect</string><ProtectedString name="Source"><![CDATA[--!strict
+-- Mission cards. Only Free Roam is playable in Phase 1; the rest are shown
+-- with a clear "Coming soon" state instead of pretending to work.
+local Theme = require(script.Parent.Parent.Theme)
+local Missions = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared").Config.Missions)
+
+local function formatCash(n: number): string
+	local s = tostring(n)
+	local formatted = s:reverse():gsub("(%d%d%d)", "%1,"):reverse()
+	if formatted:sub(1, 1) == "," then
+		formatted = formatted:sub(2)
+	end
+	return "$" .. formatted
+end
+
+return function(ctx: any)
+	local screen = Theme.screen(ctx.root, "MissionSelect")
+	local group = screen:FindFirstChild("Group") :: CanvasGroup
+	local mode = "Solo"
+
+	Theme.header(group, "SELECT A MISSION", function()
+		ctx.router.show(if mode == "Party" then "Party" else "MainMenu")
+	end)
+
+	local modeLabel = Theme.label(group, "", Theme.Fonts.Body, 18, Theme.Colors.Muted)
+	modeLabel.Position = UDim2.new(0, 0, 0, 74)
+	modeLabel.Size = UDim2.new(1, 0, 0, 24)
+
+	local scroller = Instance.new("ScrollingFrame")
+	scroller.Name = "Cards"
+	scroller.BackgroundTransparency = 1
+	scroller.BorderSizePixel = 0
+	scroller.Position = UDim2.new(0, 0, 0, 110)
+	scroller.Size = UDim2.new(1, 0, 1, -120)
+	scroller.CanvasSize = UDim2.new()
+	scroller.AutomaticCanvasSize = Enum.AutomaticSize.X
+	scroller.ScrollingDirection = Enum.ScrollingDirection.X
+	scroller.ScrollBarThickness = 6
+	scroller.ScrollBarImageColor3 = Theme.Colors.Gold
+	scroller.Parent = group
+	local list = Instance.new("UIListLayout")
+	list.FillDirection = Enum.FillDirection.Horizontal
+	list.Padding = UDim.new(0, 20)
+	list.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	list.VerticalAlignment = Enum.VerticalAlignment.Center
+	list.Parent = scroller
+	local pad = Instance.new("UIPadding")
+	pad.PaddingLeft = UDim.new(0, 10)
+	pad.PaddingRight = UDim.new(0, 10)
+	pad.Parent = scroller
+
+	for i, mission in Missions do
+		local card = Theme.panel(scroller, mission.Id)
+		card.LayoutOrder = i
+		card.Size = UDim2.new(0, 270, 0, 470)
+		card.ClipsDescendants = true
+
+		local stripe = Instance.new("Frame")
+		stripe.Name = "Accent"
+		stripe.BackgroundColor3 = mission.Accent
+		stripe.BorderSizePixel = 0
+		stripe.Size = UDim2.new(1, 0, 0, 120)
+		stripe.Parent = card
+		Theme.gradient(stripe, Color3.new(1, 1, 1), Color3.fromRGB(150, 150, 170))
+		local icon = Theme.label(stripe, if mission.Playable then "❄" else "🎁", Theme.Fonts.Title, 64, Theme.Colors.Snow)
+		icon.Size = UDim2.fromScale(1, 1)
+
+		local body = Instance.new("Frame")
+		body.BackgroundTransparency = 1
+		body.Position = UDim2.new(0, 16, 0, 132)
+		body.Size = UDim2.new(1, -32, 1, -148)
+		body.Parent = card
+		local bl = Instance.new("UIListLayout")
+		bl.Padding = UDim.new(0, 8)
+		bl.SortOrder = Enum.SortOrder.LayoutOrder
+		bl.Parent = body
+
+		local name = Theme.label(body, mission.Name, Theme.Fonts.Heading, 26, Theme.Colors.Snow)
+		name.LayoutOrder = 1
+		name.TextXAlignment = Enum.TextXAlignment.Left
+
+		local pills = Instance.new("Frame")
+		pills.BackgroundTransparency = 1
+		pills.Size = UDim2.new(1, 0, 0, 28)
+		pills.LayoutOrder = 2
+		pills.Parent = body
+		local pl = Instance.new("UIListLayout")
+		pl.FillDirection = Enum.FillDirection.Horizontal
+		pl.Padding = UDim.new(0, 8)
+		pl.Parent = pills
+		local function pill(text: string, color: Color3)
+			local p = Instance.new("TextLabel")
+			p.AutomaticSize = Enum.AutomaticSize.X
+			p.Size = UDim2.new(0, 0, 1, 0)
+			p.BackgroundColor3 = color
+			p.Text = text
+			p.FontFace = Theme.Fonts.Bold
+			p.TextSize = 15
+			p.TextColor3 = Theme.Colors.Snow
+			Theme.corner(p, 14)
+			local pp = Instance.new("UIPadding")
+			pp.PaddingLeft = UDim.new(0, 12)
+			pp.PaddingRight = UDim.new(0, 12)
+			pp.Parent = p
+			p.Parent = pills
+		end
+		pill(mission.Difficulty:upper(), mission.Accent:Lerp(Color3.new(0, 0, 0), 0.25))
+		if mission.Reward then
+			pill(formatCash(mission.Reward), Color3.fromRGB(60, 120, 70))
+		end
+
+		local desc = Theme.label(body, mission.Description, Theme.Fonts.Body, 16, Theme.Colors.Muted)
+		desc.LayoutOrder = 3
+		desc.Size = UDim2.new(1, 0, 0, 150)
+		desc.TextXAlignment = Enum.TextXAlignment.Left
+		desc.TextYAlignment = Enum.TextYAlignment.Top
+
+		local btnHolder = Instance.new("Frame")
+		btnHolder.BackgroundTransparency = 1
+		btnHolder.AnchorPoint = Vector2.new(0.5, 1)
+		btnHolder.Position = UDim2.new(0.5, 0, 1, -16)
+		btnHolder.Size = UDim2.new(1, -32, 0, 58)
+		btnHolder.Parent = card
+		if mission.Playable then
+			Theme.button(btnHolder, { text = "PLAY", color = Theme.Colors.Green, darkColor = Theme.Colors.GreenDark, size = UDim2.fromScale(1, 1) }, function()
+				ctx.startFreeRoam(mission.Id)
+			end)
+		else
+			Theme.button(btnHolder, { text = "LOCKED", size = UDim2.fromScale(1, 1), enabled = false, badge = "SOON" })
+		end
+	end
+
+	return screen, function(params: any?)
+		mode = if params and params.mode then params.mode else mode
+		modeLabel.Text = if mode == "Party"
+			then "Party mode: missions launch for your party in a later update. Free Roam works now."
+			else "Solo"
+	end
+end
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX00000028"><Properties><string name="Name">Party</string><ProtectedString name="Source"><![CDATA[--!strict
+-- Party menu foundation. Everything that works today works for real
+-- (navigation, friend invite prompt). Party creation, ready sync and privacy
+-- are local previews only until the multiplayer phase, and say so on screen.
+local Players = game:GetService("Players")
+local SocialService = game:GetService("SocialService")
+
+local Theme = require(script.Parent.Parent.Theme)
+
+local MAX_SLOTS = 4
+
+return function(ctx: any)
+	local screen = Theme.screen(ctx.root, "Party")
+	local group = screen:FindFirstChild("Group") :: CanvasGroup
+	local player = Players.LocalPlayer
+
+	Theme.header(group, "PARTY", function()
+		ctx.router.show("MainMenu")
+	end)
+
+	local notice = Theme.label(group, "Preview: parties and matchmaking arrive in the multiplayer update. Invites already work, and Free Roam is shared with everyone on this server.", Theme.Fonts.Body, 16, Theme.Colors.Muted)
+	notice.Position = UDim2.new(0, 100, 0, 74)
+	notice.Size = UDim2.new(1, -200, 0, 40)
+
+	-- Player slots.
+	local slots = Instance.new("Frame")
+	slots.Name = "Slots"
+	slots.BackgroundTransparency = 1
+	slots.AnchorPoint = Vector2.new(0.5, 0)
+	slots.Position = UDim2.new(0.5, 0, 0, 130)
+	slots.Size = UDim2.new(0, 1000, 0, 280)
+	slots.Parent = group
+	local sl = Instance.new("UIListLayout")
+	sl.FillDirection = Enum.FillDirection.Horizontal
+	sl.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	sl.Padding = UDim.new(0, 20)
+	sl.Parent = slots
+
+	local readyLabel: TextLabel? = nil
+	for i = 1, MAX_SLOTS do
+		local slot = Theme.panel(slots, "Slot" .. i)
+		slot.Size = UDim2.new(0, 230, 1, 0)
+		slot.LayoutOrder = i
+		if i == 1 then
+			local avatar = Instance.new("ImageLabel")
+			avatar.BackgroundColor3 = Theme.Colors.PanelLight
+			avatar.AnchorPoint = Vector2.new(0.5, 0)
+			avatar.Position = UDim2.new(0.5, 0, 0, 30)
+			avatar.Size = UDim2.new(0, 130, 0, 130)
+			Theme.corner(avatar, 65)
+			avatar.Parent = slot
+			task.spawn(function()
+				local ok, img = pcall(function()
+					return Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
+				end)
+				if ok then
+					avatar.Image = img
+				end
+			end)
+			local crown = Theme.label(slot, "👑 LEADER", Theme.Fonts.Bold, 16, Theme.Colors.Gold)
+			crown.Position = UDim2.new(0, 0, 0, 4)
+			crown.Size = UDim2.new(1, 0, 0, 24)
+			local name = Theme.label(slot, player.DisplayName, Theme.Fonts.Heading, 24, Theme.Colors.Snow)
+			name.Position = UDim2.new(0, 10, 0, 170)
+			name.Size = UDim2.new(1, -20, 0, 30)
+			name.TextScaled = true
+			readyLabel = Theme.label(slot, "NOT READY", Theme.Fonts.Bold, 18, Color3.fromRGB(240, 120, 120))
+			;(readyLabel :: TextLabel).Position = UDim2.new(0, 0, 0, 215)
+		else
+			local empty = Theme.label(slot, "+", Theme.Fonts.Title, 80, Theme.Colors.Muted)
+			empty.Position = UDim2.new(0, 0, 0, 60)
+			empty.Size = UDim2.new(1, 0, 0, 90)
+			empty.TextTransparency = 0.4
+			local t = Theme.label(slot, "Empty slot", Theme.Fonts.Body, 18, Theme.Colors.Muted)
+			t.Position = UDim2.new(0, 0, 0, 170)
+		end
+	end
+
+	-- Controls row.
+	local controls = Instance.new("Frame")
+	controls.BackgroundTransparency = 1
+	controls.AnchorPoint = Vector2.new(0.5, 0)
+	controls.Position = UDim2.new(0.5, 0, 0, 430)
+	controls.Size = UDim2.new(0, 1000, 0, 64)
+	controls.Parent = group
+	local cl = Instance.new("UIListLayout")
+	cl.FillDirection = Enum.FillDirection.Horizontal
+	cl.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	cl.Padding = UDim.new(0, 16)
+	cl.Parent = controls
+
+	Theme.button(controls, { text = "INVITE FRIENDS", color = Color3.fromRGB(70, 120, 220), darkColor = Color3.fromRGB(40, 70, 150), size = UDim2.new(0, 240, 1, 0), textSize = 22 }, function()
+		local ok, canInvite = pcall(function()
+			return SocialService:CanSendGameInviteAsync(player)
+		end)
+		if ok and canInvite then
+			pcall(function()
+				SocialService:PromptGameInvite(player)
+			end)
+		else
+			ctx.toast("Invites aren't available right now (they don't work in Studio test mode).")
+		end
+	end)
+
+	local ready = false
+	local readyBtn: TextButton
+	readyBtn = Theme.button(controls, { text = "READY", color = Theme.Colors.Green, darkColor = Theme.Colors.GreenDark, size = UDim2.new(0, 180, 1, 0), textSize = 22 }, function()
+		ready = not ready
+		readyBtn.Text = if ready then "UNREADY" else "READY"
+		if readyLabel then
+			readyLabel.Text = if ready then "READY" else "NOT READY"
+			readyLabel.TextColor3 = if ready then Color3.fromRGB(120, 230, 140) else Color3.fromRGB(240, 120, 120)
+		end
+	end)
+
+	local privacyOptions = { "PUBLIC", "FRIENDS", "PRIVATE" }
+	local privacyIndex = 2
+	local privacyBtn: TextButton
+	privacyBtn = Theme.button(controls, { text = "PRIVACY: FRIENDS", color = Theme.Colors.PanelLight, darkColor = Theme.Colors.Night, size = UDim2.new(0, 260, 1, 0), textSize = 20 }, function()
+		privacyIndex = privacyIndex % #privacyOptions + 1
+		privacyBtn.Text = "PRIVACY: " .. privacyOptions[privacyIndex]
+	end)
+
+	local continueHolder = Instance.new("Frame")
+	continueHolder.BackgroundTransparency = 1
+	continueHolder.AnchorPoint = Vector2.new(0.5, 0)
+	continueHolder.Position = UDim2.new(0.5, 0, 0, 520)
+	continueHolder.Size = UDim2.new(0, 420, 0, 72)
+	continueHolder.Parent = group
+	Theme.button(continueHolder, { text = "CONTINUE TO MISSIONS", color = Theme.Colors.Red, darkColor = Theme.Colors.RedDark, size = UDim2.fromScale(1, 1), textSize = 26 }, function()
+		ctx.router.show("MissionSelect", { mode = "Party" })
+	end)
+
+	return screen
+end
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX00000029"><Properties><string name="Name">SettingsScreen</string><ProtectedString name="Source"><![CDATA[--!strict
+-- Settings: music on/off, music volume slider, snow quality, animated lights.
+local UserInputService = game:GetService("UserInputService")
+
+local Theme = require(script.Parent.Parent.Theme)
+local Settings = require(script.Parent.Parent.Parent.Settings)
+local Music = require(script.Parent.Parent.Parent.Audio.MusicController)
+
+local function row(parent: Instance, label: string, order: number): Frame
+	local r = Instance.new("Frame")
+	r.BackgroundTransparency = 1
+	r.Size = UDim2.new(1, 0, 0, 64)
+	r.LayoutOrder = order
+	r.Parent = parent
+	local l = Theme.label(r, label, Theme.Fonts.Heading, 24, Theme.Colors.Snow)
+	l.Size = UDim2.new(0.4, 0, 1, 0)
+	l.TextXAlignment = Enum.TextXAlignment.Left
+	return r
+end
+
+local function toggle(parent: Frame, key: string)
+	local holder = Instance.new("Frame")
+	holder.BackgroundTransparency = 1
+	holder.AnchorPoint = Vector2.new(1, 0.5)
+	holder.Position = UDim2.new(1, 0, 0.5, 0)
+	holder.Size = UDim2.new(0, 180, 0, 54)
+	holder.Parent = parent
+	local btn: TextButton
+	local function refresh()
+		local on = Settings.get(key)
+		btn.Text = if on then "ON" else "OFF"
+		btn.BackgroundColor3 = if on then Theme.Colors.Green else Theme.Colors.Disabled
+		local baseFrame = (btn.Parent :: Instance):FindFirstChild("Base") :: Frame?
+		if baseFrame then
+			baseFrame.BackgroundColor3 = if on then Theme.Colors.GreenDark else Color3.fromRGB(60, 66, 84)
+		end
+	end
+	btn = Theme.button(holder, { text = "ON", color = Theme.Colors.Green, darkColor = Theme.Colors.GreenDark, size = UDim2.fromScale(1, 1), textSize = 22 }, function()
+		Settings.set(key, not Settings.get(key))
+		refresh()
+	end)
+	refresh()
+end
+
+return function(ctx: any)
+	local screen = Theme.screen(ctx.root, "Settings")
+	local group = screen:FindFirstChild("Group") :: CanvasGroup
+	Theme.header(group, "SETTINGS", function()
+		ctx.router.show("MainMenu")
+	end)
+
+	local panel = Theme.panel(group, "Panel")
+	panel.AnchorPoint = Vector2.new(0.5, 0)
+	panel.Position = UDim2.new(0.5, 0, 0, 100)
+	panel.Size = UDim2.new(0, 700, 0, 470)
+	Theme.padding(panel, 28)
+	local list = Instance.new("UIListLayout")
+	list.Padding = UDim.new(0, 14)
+	list.SortOrder = Enum.SortOrder.LayoutOrder
+	list.Parent = panel
+
+	toggle(row(panel, "Music", 1), "MusicEnabled")
+
+	-- Volume slider.
+	local volRow = row(panel, "Music Volume", 2)
+	local track = Instance.new("Frame")
+	track.Name = "Track"
+	track.AnchorPoint = Vector2.new(1, 0.5)
+	track.Position = UDim2.new(1, -70, 0.5, 0)
+	track.Size = UDim2.new(0.5, -40, 0, 14)
+	track.BackgroundColor3 = Theme.Colors.Night
+	Theme.corner(track, 7)
+	track.Parent = volRow
+	local fill = Instance.new("Frame")
+	fill.BackgroundColor3 = Theme.Colors.Gold
+	fill.Size = UDim2.fromScale(Settings.get("MusicVolume"), 1)
+	Theme.corner(fill, 7)
+	fill.Parent = track
+	local knob = Instance.new("TextButton")
+	knob.Text = ""
+	knob.AutoButtonColor = false
+	knob.AnchorPoint = Vector2.new(0.5, 0.5)
+	knob.Position = UDim2.new(Settings.get("MusicVolume"), 0, 0.5, 0)
+	knob.Size = UDim2.new(0, 30, 0, 30)
+	knob.BackgroundColor3 = Theme.Colors.Snow
+	Theme.corner(knob, 15)
+	Theme.stroke(knob, Theme.Colors.Gold, 3)
+	knob.Parent = track
+	local pct = Theme.label(volRow, "", Theme.Fonts.Bold, 20, Theme.Colors.Snow)
+	pct.AnchorPoint = Vector2.new(1, 0.5)
+	pct.Position = UDim2.new(1, 0, 0.5, 0)
+	pct.Size = UDim2.new(0, 60, 0, 30)
+	local function setFromX(x: number)
+		local rel = math.clamp((x - track.AbsolutePosition.X) / math.max(1, track.AbsoluteSize.X), 0, 1)
+		rel = math.floor(rel * 20 + 0.5) / 20
+		Settings.set("MusicVolume", rel)
+	end
+	local function refreshVol()
+		local v = Settings.get("MusicVolume")
+		fill.Size = UDim2.fromScale(v, 1)
+		knob.Position = UDim2.new(v, 0, 0.5, 0)
+		pct.Text = string.format("%d%%", math.floor(v * 100 + 0.5))
+	end
+	refreshVol()
+	local dragging = false
+	local function beginDrag(input: InputObject)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			setFromX(input.Position.X)
+		end
+	end
+	knob.InputBegan:Connect(beginDrag)
+	track.InputBegan:Connect(beginDrag)
+	UserInputService.InputChanged:Connect(function(input)
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			setFromX(input.Position.X)
+		end
+	end)
+	UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = false
+		end
+	end)
+	Settings.Changed:Connect(function(key)
+		if key == "MusicVolume" then
+			refreshVol()
+		end
+	end)
+
+	-- Snow quality selector.
+	local snowRow = row(panel, "Snowfall", 3)
+	local opts = Instance.new("Frame")
+	opts.BackgroundTransparency = 1
+	opts.AnchorPoint = Vector2.new(1, 0.5)
+	opts.Position = UDim2.new(1, 0, 0.5, 0)
+	opts.Size = UDim2.new(0.6, 0, 0, 50)
+	opts.Parent = snowRow
+	local ol = Instance.new("UIListLayout")
+	ol.FillDirection = Enum.FillDirection.Horizontal
+	ol.HorizontalAlignment = Enum.HorizontalAlignment.Right
+	ol.Padding = UDim.new(0, 8)
+	ol.Parent = opts
+	local optionButtons: { [string]: TextButton } = {}
+	local function refreshSnow()
+		for level, b in optionButtons do
+			local selected = Settings.get("SnowQuality") == level
+			b.BackgroundColor3 = if selected then Theme.Colors.Red else Theme.Colors.PanelLight
+		end
+	end
+	for _, level in Settings.SnowLevels do
+		optionButtons[level] = Theme.button(opts, { text = level:upper(), color = Theme.Colors.PanelLight, darkColor = Theme.Colors.Night, size = UDim2.new(0, 92, 1, 0), textSize = 16 }, function()
+			Settings.set("SnowQuality", level)
+			refreshSnow()
+		end)
+	end
+	refreshSnow()
+
+	toggle(row(panel, "Animated Lights", 4), "AnimatedLights")
+
+	local hasMusic = Music.hasTrack("Menu") or Music.hasTrack("Outside")
+	local info = Theme.label(panel, if hasMusic
+		then "Lower the snowfall if the game feels slow on your device."
+		else "No music tracks are set up yet. Add licensed track IDs in Shared/Config/Audio.", Theme.Fonts.Body, 15, Theme.Colors.Muted)
+	info.LayoutOrder = 5
+	info.Size = UDim2.new(1, 0, 0, 40)
+	return screen
+end
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX0000002A"><Properties><string name="Name">Upgrades</string><ProtectedString name="Source"><![CDATA[--!strict
+-- Upgrade shop preview. Prices come from Shared/Config/Economy; buying
+-- arrives with the economy phase, so cards show a locked state.
+local Theme = require(script.Parent.Parent.Theme)
+local Economy = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared").Config.Economy)
+
+return function(ctx: any)
+	local screen = Theme.screen(ctx.root, "Upgrades")
+	local group = screen:FindFirstChild("Group") :: CanvasGroup
+	Theme.header(group, "UPGRADES", function()
+		ctx.router.show("MainMenu")
+	end)
+
+	local cash = Theme.label(group, "Your cash: $" .. tostring(Economy.StartingCash), Theme.Fonts.Heading, 24, Theme.Colors.Gold)
+	cash.Position = UDim2.new(0, 0, 0, 76)
+	cash.Size = UDim2.new(1, 0, 0, 30)
+
+	local note = Theme.label(group, "Earn cash from missions to unlock upgrades. The shop opens with the first heist missions.", Theme.Fonts.Body, 16, Theme.Colors.Muted)
+	note.Position = UDim2.new(0, 0, 0, 108)
+	note.Size = UDim2.new(1, 0, 0, 22)
+
+	local grid = Instance.new("Frame")
+	grid.BackgroundTransparency = 1
+	grid.AnchorPoint = Vector2.new(0.5, 0)
+	grid.Position = UDim2.new(0.5, 0, 0, 150)
+	grid.Size = UDim2.new(0, 900, 0, 480)
+	grid.Parent = group
+	local layout = Instance.new("UIGridLayout")
+	layout.CellSize = UDim2.new(0, 430, 0, 200)
+	layout.CellPadding = UDim2.new(0, 20, 0, 20)
+	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = grid
+
+	for i, up in Economy.Upgrades do
+		local card = Theme.panel(grid, up.Id)
+		card.LayoutOrder = i
+		Theme.padding(card, 16)
+		local name = Theme.label(card, up.Name, Theme.Fonts.Heading, 26, Theme.Colors.Snow)
+		name.TextXAlignment = Enum.TextXAlignment.Left
+		local desc = Theme.label(card, up.Description, Theme.Fonts.Body, 16, Theme.Colors.Muted)
+		desc.Position = UDim2.new(0, 0, 0, 40)
+		desc.Size = UDim2.new(1, 0, 0, 44)
+		desc.TextXAlignment = Enum.TextXAlignment.Left
+		local price = Theme.label(card, "$" .. string.format("%d", up.Cost):reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", ""), Theme.Fonts.Heading, 28, Theme.Colors.Gold)
+		price.AnchorPoint = Vector2.new(0, 1)
+		price.Position = UDim2.new(0, 0, 1, -4)
+		price.Size = UDim2.new(0.5, 0, 0, 36)
+		price.TextXAlignment = Enum.TextXAlignment.Left
+		local holder = Instance.new("Frame")
+		holder.BackgroundTransparency = 1
+		holder.AnchorPoint = Vector2.new(1, 1)
+		holder.Position = UDim2.new(1, 0, 1, 0)
+		holder.Size = UDim2.new(0, 160, 0, 52)
+		holder.Parent = card
+		Theme.button(holder, { text = "LOCKED", size = UDim2.fromScale(1, 1), enabled = false, textSize = 20 })
+	end
+	return screen
+end
+]]></ProtectedString></Properties></Item></Item><Item class="ModuleScript" referent="RBX0000002C"><Properties><string name="Name">Theme</string><ProtectedString name="Source"><![CDATA[--!strict
+-- Visual theme and small UI building helpers (buttons, panels, labels).
+local TweenService = game:GetService("TweenService")
+
+local Theme = {}
+
+Theme.Colors = {
+	Night = Color3.fromRGB(14, 22, 48),
+	Panel = Color3.fromRGB(22, 34, 70),
+	PanelLight = Color3.fromRGB(34, 50, 98),
+	Red = Color3.fromRGB(200, 45, 55),
+	RedDark = Color3.fromRGB(140, 25, 35),
+	Green = Color3.fromRGB(46, 150, 86),
+	GreenDark = Color3.fromRGB(28, 100, 58),
+	Gold = Color3.fromRGB(246, 200, 90),
+	Snow = Color3.fromRGB(245, 249, 255),
+	Muted = Color3.fromRGB(170, 185, 220),
+	Disabled = Color3.fromRGB(90, 98, 120),
+}
+
+Theme.Fonts = {
+	Title = Font.new("rbxasset://fonts/families/FredokaOne.json", Enum.FontWeight.Regular),
+	Heading = Font.new("rbxasset://fonts/families/FredokaOne.json", Enum.FontWeight.Regular),
+	Body = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium),
+	Bold = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold),
+}
+
+local FAST = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local BOUNCE = TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+
+function Theme.tween(inst: Instance, info: TweenInfo, goal: { [string]: any }): Tween
+	local t = TweenService:Create(inst, info, goal)
+	t:Play()
+	return t
+end
+
+function Theme.corner(parent: Instance, radius: number?)
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(0, radius or 14)
+	c.Parent = parent
+	return c
+end
+
+function Theme.stroke(parent: Instance, color: Color3?, thickness: number?, transparency: number?)
+	local s = Instance.new("UIStroke")
+	s.Color = color or Theme.Colors.Gold
+	s.Thickness = thickness or 2
+	s.Transparency = transparency or 0
+	s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	s.Parent = parent
+	return s
+end
+
+function Theme.gradient(parent: Instance, top: Color3, bottom: Color3)
+	local g = Instance.new("UIGradient")
+	g.Color = ColorSequence.new(top, bottom)
+	g.Rotation = 90
+	g.Parent = parent
+	return g
+end
+
+function Theme.padding(parent: Instance, px: number)
+	local p = Instance.new("UIPadding")
+	p.PaddingTop = UDim.new(0, px)
+	p.PaddingBottom = UDim.new(0, px)
+	p.PaddingLeft = UDim.new(0, px)
+	p.PaddingRight = UDim.new(0, px)
+	p.Parent = parent
+	return p
+end
+
+function Theme.label(parent: Instance, text: string, font: Font, size: number, color: Color3?): TextLabel
+	local l = Instance.new("TextLabel")
+	l.BackgroundTransparency = 1
+	l.Text = text
+	l.FontFace = font
+	l.TextSize = size
+	l.TextColor3 = color or Theme.Colors.Snow
+	l.TextWrapped = true
+	l.Size = UDim2.new(1, 0, 0, size + 8)
+	l.Parent = parent
+	return l
+end
+
+function Theme.panel(parent: Instance, name: string): Frame
+	local f = Instance.new("Frame")
+	f.Name = name
+	f.BackgroundColor3 = Theme.Colors.Panel
+	f.BackgroundTransparency = 0.08
+	f.BorderSizePixel = 0
+	Theme.corner(f, 20)
+	Theme.stroke(f, Theme.Colors.Gold, 2, 0.35)
+	Theme.gradient(f, Color3.new(1, 1, 1), Color3.fromRGB(190, 200, 230))
+	f.Parent = parent
+	return f
+end
+
+export type ButtonOpts = {
+	text: string,
+	color: Color3?,
+	darkColor: Color3?,
+	size: UDim2?,
+	textSize: number?,
+	enabled: boolean?,
+	badge: string?, -- small tag such as "SOON"
+}
+
+-- Candy-style button with hover lift, press squash and click callback.
+function Theme.button(parent: Instance, opts: ButtonOpts, onClick: (() -> ())?): TextButton
+	local enabled = opts.enabled ~= false
+	local color = if enabled then (opts.color or Theme.Colors.Red) else Theme.Colors.Disabled
+	local dark = if enabled then (opts.darkColor or Theme.Colors.RedDark) else Color3.fromRGB(60, 66, 84)
+
+	local holder = Instance.new("Frame")
+	holder.Name = opts.text .. "Holder"
+	holder.BackgroundTransparency = 1
+	holder.Size = opts.size or UDim2.new(1, 0, 0, 64)
+	holder.Parent = parent
+
+	-- Darker "base" under the face gives a chunky 3D look.
+	local base = Instance.new("Frame")
+	base.Name = "Base"
+	base.BackgroundColor3 = dark
+	base.BorderSizePixel = 0
+	base.Size = UDim2.new(1, 0, 1, 0)
+	base.Position = UDim2.new(0, 0, 0, 0)
+	Theme.corner(base, 16)
+	base.Parent = holder
+
+	local button = Instance.new("TextButton")
+	button.Name = opts.text
+	button.AutoButtonColor = false
+	button.BackgroundColor3 = color
+	button.BorderSizePixel = 0
+	button.Size = UDim2.new(1, 0, 1, -6)
+	button.Position = UDim2.new(0, 0, 0, 0)
+	button.Text = opts.text
+	button.FontFace = Theme.Fonts.Heading
+	button.TextSize = opts.textSize or 26
+	button.TextColor3 = Theme.Colors.Snow
+	button.Active = enabled
+	Theme.corner(button, 16)
+	Theme.gradient(button, Color3.new(1, 1, 1), Color3.fromRGB(205, 205, 215))
+	local stroke = Theme.stroke(button, Color3.new(1, 1, 1), 2, 0.6)
+	local textStroke = Instance.new("UIStroke")
+	textStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+	textStroke.Color = dark
+	textStroke.Thickness = 2
+	textStroke.Parent = button
+	button.Parent = holder
+
+	if opts.badge then
+		local badge = Instance.new("TextLabel")
+		badge.Name = "Badge"
+		badge.AnchorPoint = Vector2.new(1, 0)
+		badge.Position = UDim2.new(1, 6, 0, -8)
+		badge.Size = UDim2.new(0, 64, 0, 22)
+		badge.BackgroundColor3 = Theme.Colors.Gold
+		badge.Text = opts.badge
+		badge.FontFace = Theme.Fonts.Bold
+		badge.TextSize = 13
+		badge.TextColor3 = Theme.Colors.Night
+		badge.ZIndex = 3
+		Theme.corner(badge, 11)
+		badge.Parent = holder
+	end
+
+	if not enabled then
+		button.TextTransparency = 0.35
+		return button
+	end
+
+	local up = UDim2.new(0, 0, 0, -3)
+	local rest = UDim2.new(0, 0, 0, 0)
+	local down = UDim2.new(0, 0, 0, 4)
+	button.MouseEnter:Connect(function()
+		Theme.tween(button, FAST, { Position = up })
+		Theme.tween(stroke, FAST, { Transparency = 0.1 })
+	end)
+	button.MouseLeave:Connect(function()
+		Theme.tween(button, FAST, { Position = rest })
+		Theme.tween(stroke, FAST, { Transparency = 0.6 })
+	end)
+	button.MouseButton1Down:Connect(function()
+		Theme.tween(button, FAST, { Position = down })
+	end)
+	button.MouseButton1Up:Connect(function()
+		Theme.tween(button, BOUNCE, { Position = rest })
+	end)
+	button.Activated:Connect(function()
+		Theme.tween(button, BOUNCE, { Position = rest })
+		if onClick then
+			onClick()
+		end
+	end)
+	return button
+end
+
+-- Screen-sized container that the router fades and slides in/out.
+function Theme.screen(parent: Instance, name: string): Frame
+	local f = Instance.new("Frame")
+	f.Name = name
+	f.BackgroundTransparency = 1
+	f.Size = UDim2.fromScale(1, 1)
+	f.Visible = false
+	f.Parent = parent
+	local group = Instance.new("CanvasGroup")
+	group.Name = "Group"
+	group.BackgroundTransparency = 1
+	group.Size = UDim2.fromScale(1, 1)
+	group.Parent = f
+	return f
+end
+
+-- Header used by sub-screens: back button on the left, title centered.
+function Theme.header(parent: Instance, title: string, onBack: () -> ()): Frame
+	local bar = Instance.new("Frame")
+	bar.Name = "Header"
+	bar.BackgroundTransparency = 1
+	bar.Size = UDim2.new(1, 0, 0, 70)
+	bar.Parent = parent
+	local back = Theme.button(bar, { text = "< BACK", color = Theme.Colors.PanelLight, darkColor = Theme.Colors.Night, size = UDim2.new(0, 130, 0, 52), textSize = 22 }, onBack)
+	local holder = back.Parent :: Frame
+	holder.Position = UDim2.new(0, 0, 0.5, -26)
+	local t = Theme.label(bar, title, Theme.Fonts.Title, 40, Theme.Colors.Gold)
+	t.Size = UDim2.new(1, -300, 1, 0)
+	t.Position = UDim2.new(0, 150, 0, 0)
+	t.TextScaled = true
+	local constraint = Instance.new("UITextSizeConstraint")
+	constraint.MaxTextSize = 44
+	constraint.Parent = t
+	local s = Instance.new("UIStroke")
+	s.Color = Theme.Colors.RedDark
+	s.Thickness = 3
+	s.Parent = t
+	return bar
+end
+
+return Theme
+]]></ProtectedString></Properties></Item></Item></Item></Item></Item><Item class="SoundService" referent="RBX00000031"><Properties><string name="Name">SoundService</string></Properties></Item></roblox>
